@@ -24,19 +24,14 @@ def ask_agent(question: str):
                 "is required.\n"
                 "2. Use the web_search tool whenever current, recent, or "
                 "up-to-date information is required.\n"
-                "3. When using web search, base your answer on the retrieved "
-                "search results.\n"
+                "3. When using web search, base your answer only on the "
+                "retrieved search results.\n"
                 "4. Do not invent facts, sources, URLs, or citations.\n"
-                "5. For web-search answers, include a 'Sources' section.\n"
-                "6. Use ONLY the sources returned by the web_search tool.\n"
-                "7. Preserve the exact source title and URL returned by the tool.\n"
-                "8. Do not invent, modify, or guess any source title or URL.\n"
-                "9. When making a factual claim from a search result, "
-                "identify the relevant source using [Source 1], [Source 2], etc.\n"
-                "10. If the retrieved sources do not provide enough evidence, "
+                "5. For web-search answers, refer to sources as "
+                "[Source 1], [Source 2], etc.\n"
+                "6. Use only the source IDs provided by the web_search tool.\n"
+                "7. If the retrieved sources do not provide enough evidence, "
                 "say that the available sources are insufficient rather than guessing."
-                
-                
             ),
         },
         {
@@ -58,6 +53,9 @@ def ask_agent(question: str):
     # No tool needed
     if not message.tool_calls:
         return message.content
+
+    # Store actual sources returned by web search
+    web_sources = []
 
     # Add assistant tool-call message
     messages.append(
@@ -99,11 +97,21 @@ def ask_agent(question: str):
                 arguments["query"]
             )
 
+            # Save actual sources returned by Tavily
+            try:
+                parsed_result = json.loads(result)
+
+                if isinstance(parsed_result, list):
+                    web_sources.extend(parsed_result)
+
+            except Exception:
+                pass
+
         else:
 
             result = "Unknown tool."
 
-        # Send tool result back to the AI
+        # Send tool result back to AI
         messages.append(
             {
                 "role": "tool",
@@ -119,16 +127,37 @@ def ask_agent(question: str):
             "content": (
                 "Now provide the final answer using only the tool results "
                 "already provided. Do not call any tools. "
-                "Do not invent sources or URLs."
+                "Do not invent facts, sources, or URLs. "
+                "When referring to web-search evidence, use the source IDs "
+                "provided by the tool results."
             ),
         }
     )
 
-    # Final call: AI generates the answer
+    # Final call
     final_response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=messages,
         tool_choice="none",
     )
 
-    return final_response.choices[0].message.content
+    final_answer = final_response.choices[0].message.content
+
+    # Python adds the exact URLs returned by Tavily
+    if web_sources:
+
+        final_answer += "\n\n## Sources\n\n"
+
+        for source in web_sources:
+
+            source_id = source.get("source_id", "")
+            title = source.get("title", "")
+            url = source.get("url", "")
+
+            if title and url:
+                final_answer += (
+                    f"[Source {source_id}] {title}\n"
+                    f"{url}\n\n"
+                )
+
+    return final_answer
