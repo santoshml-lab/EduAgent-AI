@@ -37,30 +37,15 @@ def ask_agent(question: str):
         },
     ]
 
-    messages.append(
-    {
-        "role": "system",
-        "content": (
-            "Now provide the final answer using only the tool results "
-            "already provided. Do not call any tools. "
-            "Do not invent sources or URLs."
-        ),
-    }
-)
+    # First call: AI decides whether a tool is needed
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=messages,
+        tools=TOOLS,
+        tool_choice="auto",
+    )
 
-final_response = client.chat.completions.create(
-    model="openai/gpt-oss-20b",
-    messages=messages,
-    tool_choice="none",
-)
-
-return final_response.choices[0].message.content
-     
-
-    
-    
-
-    
+    message = response.choices[0].message
 
     # No tool needed
     if not message.tool_calls:
@@ -119,10 +104,23 @@ return final_response.choices[0].message.content
             }
         )
 
-    # Final call: AI uses tool results
+    # Final answer instruction
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                "Now provide the final answer using only the tool results "
+                "already provided. Do not call any tools. "
+                "Do not invent sources or URLs."
+            ),
+        }
+    )
+
+    # Final call: AI generates the answer
     final_response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=messages,
+        tool_choice="none",
     )
 
     return final_response.choices[0].message.content
