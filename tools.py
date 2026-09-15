@@ -9,7 +9,6 @@ def calculator(expression: str):
     except Exception:
         return "Unable to calculate this expression."
 
-
 def web_search(query: str):
     try:
         tavily = TavilyClient()
@@ -23,9 +22,13 @@ def web_search(query: str):
 
         results = []
 
-        for item in response.get("results", []):
+        for index, item in enumerate(
+            response.get("results", []),
+            start=1
+        ):
             results.append(
                 {
+                    "source_id": index,
                     "title": item.get("title", ""),
                     "url": item.get("url", ""),
                     "content": item.get("content", "")
@@ -44,6 +47,12 @@ def web_search(query: str):
             },
             ensure_ascii=False
         )
+
+
+
+        
+
+        
 
 
 TOOLS = [
