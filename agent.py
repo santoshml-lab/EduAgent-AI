@@ -3,7 +3,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-from tools import calculator, TOOLS
+from tools import calculator, web_search, TOOLS
 
 load_dotenv()
 
