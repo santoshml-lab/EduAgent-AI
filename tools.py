@@ -1,5 +1,5 @@
-from tavily import TavilyClient
 import json
+from tavily import TavilyClient
 
 
 def calculator(expression: str):
@@ -9,6 +9,7 @@ def calculator(expression: str):
     except Exception:
         return "Unable to calculate this expression."
 
+
 def web_search(query: str):
     try:
         tavily = TavilyClient()
@@ -16,7 +17,8 @@ def web_search(query: str):
         response = tavily.search(
             query=query,
             search_depth="advanced",
-            max_results=5
+            max_results=5,
+            include_answer=False
         )
 
         results = []
@@ -30,21 +32,18 @@ def web_search(query: str):
                 }
             )
 
-        return json.dumps(results, ensure_ascii=False)
-
-    except Exception as e:
         return json.dumps(
-            {"error": f"Web search failed: {str(e)}"},
+            results,
             ensure_ascii=False
         )
 
-
-
-    
-        
-
-        
-        
+    except Exception as e:
+        return json.dumps(
+            {
+                "error": f"Web search failed: {str(e)}"
+            },
+            ensure_ascii=False
+        )
 
 
 TOOLS = [
@@ -69,13 +68,16 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the web for current or up-to-date information.",
+            "description": (
+                "Search the web for current, recent, or "
+                "up-to-date information."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The search query."
+                        "description": "The web search query."
                     }
                 },
                 "required": ["query"]
