@@ -18,7 +18,9 @@ def ask_agent(question: str):
             "content": (
                 "You are EduAgent AI, an intelligent education assistant. "
                 "Answer questions clearly and accurately. "
-                "Use the calculator tool whenever mathematical calculation is required."
+                "Use the calculator tool whenever mathematical calculation is required. "
+                "Use the web_search tool whenever current, recent, or up-to-date "
+                "information is required."
             ),
         },
         {
@@ -27,7 +29,7 @@ def ask_agent(question: str):
         },
     ]
 
-    # Step 1: Ask the LLM whether a tool is needed
+    # First call: AI decides whether a tool is needed
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=messages,
@@ -37,25 +39,55 @@ def ask_agent(question: str):
 
     message = response.choices[0].message
 
-    # Step 2: If no tool is required, return normal answer
+    # No tool needed
     if not message.tool_calls:
         return message.content
 
-    # Step 3: Add the assistant's tool request
-    messages.append(message)
+    # Add assistant tool-call message
+    messages.append(
+        {
+            "role": "assistant",
+            "content": message.content,
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    },
+                }
+                for tool_call in message.tool_calls
+            ],
+        }
+    )
 
-    # Step 4: Execute requested tool
+    # Execute tools
     for tool_call in message.tool_calls:
 
         tool_name = tool_call.function.name
-        arguments = json.loads(tool_call.function.arguments)
+
+        arguments = json.loads(
+            tool_call.function.arguments
+        )
 
         if tool_name == "calculator":
-            result = calculator(arguments["expression"])
+
+            result = calculator(
+                arguments["expression"]
+            )
+
+        elif tool_name == "web_search":
+
+            result = web_search(
+                arguments["query"]
+            )
 
         else:
+
             result = "Unknown tool."
 
+        # Send tool result back to the AI
         messages.append(
             {
                 "role": "tool",
@@ -64,7 +96,7 @@ def ask_agent(question: str):
             }
         )
 
-    # Step 5: Ask LLM to generate final answer using tool result
+    # Final AI response
     final_response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=messages,
