@@ -17,10 +17,18 @@ def ask_agent(question: str):
             "role": "system",
             "content": (
                 "You are EduAgent AI, an intelligent education assistant. "
-                "Answer questions clearly and accurately. "
-                "Use the calculator tool whenever mathematical calculation is required. "
-                "Use the web_search tool whenever current, recent, or up-to-date "
-                "information is required."
+                "Answer questions clearly and accurately.\n\n"
+
+                "TOOL RULES:\n"
+                "1. Use the calculator tool whenever mathematical calculation "
+                "is required.\n"
+                "2. Use the web_search tool whenever current, recent, or "
+                "up-to-date information is required.\n"
+                "3. When using web search, base your answer on the retrieved "
+                "search results.\n"
+                "4. Do not invent facts, sources, URLs, or citations.\n"
+                "5. For web-search answers, include a 'Sources' section "
+                "with the relevant source titles and URLs."
             ),
         },
         {
@@ -62,7 +70,7 @@ def ask_agent(question: str):
         }
     )
 
-    # Execute tools
+    # Execute requested tools
     for tool_call in message.tool_calls:
 
         tool_name = tool_call.function.name
@@ -96,7 +104,7 @@ def ask_agent(question: str):
             }
         )
 
-    # Final AI response
+    # Final call: AI uses tool results
     final_response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=messages,
