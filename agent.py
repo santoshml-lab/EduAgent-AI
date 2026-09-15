@@ -37,7 +37,6 @@ def ask_agent(question: str):
         },
     ]
 
-    # First call: AI decides whether a tool is needed
     messages.append(
     {
         "role": "system",
@@ -56,6 +55,9 @@ final_response = client.chat.completions.create(
 )
 
 return final_response.choices[0].message.content
+     
+
+    
     
 
     
