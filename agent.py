@@ -27,8 +27,16 @@ def ask_agent(question: str):
                 "3. When using web search, base your answer on the retrieved "
                 "search results.\n"
                 "4. Do not invent facts, sources, URLs, or citations.\n"
-                "5. For web-search answers, include a 'Sources' section "
-                "with the relevant source titles and URLs."
+                "5. For web-search answers, include a 'Sources' section.\n"
+                "6. Use ONLY the sources returned by the web_search tool.\n"
+                "7. Preserve the exact source title and URL returned by the tool.\n"
+                "8. Do not invent, modify, or guess any source title or URL.\n"
+                "9. When making a factual claim from a search result, "
+                "identify the relevant source using [Source 1], [Source 2], etc.\n"
+                "10. If the retrieved sources do not provide enough evidence, "
+                "say that the available sources are insufficient rather than guessing."
+                
+                
             ),
         },
         {
