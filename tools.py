@@ -1,4 +1,5 @@
 from tavily import TavilyClient
+import json
 
 
 def calculator(expression: str):
@@ -8,14 +9,13 @@ def calculator(expression: str):
     except Exception:
         return "Unable to calculate this expression."
 
-
 def web_search(query: str):
     try:
         tavily = TavilyClient()
 
         response = tavily.search(
             query=query,
-            search_depth="basic",
+            search_depth="advanced",
             max_results=5
         )
 
@@ -23,15 +23,28 @@ def web_search(query: str):
 
         for item in response.get("results", []):
             results.append(
-                f"Title: {item.get('title')}\n"
-                f"Content: {item.get('content')}\n"
-                f"URL: {item.get('url')}"
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "content": item.get("content", "")
+                }
             )
 
-        return "\n\n".join(results)
+        return json.dumps(results, ensure_ascii=False)
 
     except Exception as e:
-        return f"Web search failed: {str(e)}"
+        return json.dumps(
+            {"error": f"Web search failed: {str(e)}"},
+            ensure_ascii=False
+        )
+
+
+
+    
+        
+
+        
+        
 
 
 TOOLS = [
