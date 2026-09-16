@@ -55,6 +55,28 @@ def web_search(query: str):
             ensure_ascii=False
         )
 
+def education_router(intent: str):
+    """
+    Identify the type of education task requested by the user.
+    """
+
+    allowed_intents = {
+        "explanation",
+        "numerical",
+        "quiz",
+        "study_plan",
+        "current_information"
+    }
+
+    if intent not in allowed_intents:
+        return (
+            "Unknown education intent. "
+            "Use one of: explanation, numerical, quiz, "
+            "study_plan, current_information."
+        )
+
+    return f"Education task identified: {intent}"
+
 
 
         
@@ -100,4 +122,33 @@ TOOLS = [
             }
         }
     }
+        {
+        "type": "function",
+        "function": {
+            "name": "education_router",
+            "description": (
+                "Identify the type of education task requested "
+                "by the user."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "intent": {
+                        "type": "string",
+                        "enum": [
+                            "explanation",
+                            "numerical",
+                            "quiz",
+                            "study_plan",
+                            "current_information"
+                        ],
+                        "description": (
+                            "The education task category."
+                        )
+                    }
+                },
+                "required": ["intent"]
+            }
+        }
+}
 ]
