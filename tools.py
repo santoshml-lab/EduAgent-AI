@@ -1,13 +1,20 @@
 import json
 from tavily import TavilyClient
 
-
 def calculator(expression: str):
     try:
         result = eval(expression, {"__builtins__": {}}, {})
         return f"Calculation result: {result}"
-    except Exception:
-        return "Unable to calculate this expression."
+
+    except Exception as e:
+        return f"Calculator error: {str(e)}"
+
+
+
+    
+        
+    
+        
 
 def web_search(query: str):
     try:
