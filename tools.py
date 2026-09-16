@@ -68,25 +68,49 @@ def web_search(query: str):
 def education_router(intent: str):
     """
     Identify the type of education task
-    requested by the user.
+    and return the recommended workflow.
     """
 
-    allowed_intents = {
-        "explanation",
-        "numerical",
-        "quiz",
-        "study_plan",
-        "current_information"
+    workflows = {
+        "explanation": (
+            "Workflow: explanation. "
+            "Explain the educational concept clearly "
+            "and at an appropriate level."
+        ),
+
+        "numerical": (
+            "Workflow: numerical. "
+            "Use the calculator tool when mathematical "
+            "calculation is required, then explain the result."
+        ),
+
+        "quiz": (
+            "Workflow: quiz. "
+            "Use the quiz_generator tool before generating "
+            "the final educational quiz."
+        ),
+
+        "study_plan": (
+            "Workflow: study_plan. "
+            "Use the study_plan_generator tool before "
+            "generating the final study plan."
+        ),
+
+        "current_information": (
+            "Workflow: current_information. "
+            "Use the web_search tool to retrieve current "
+            "or up-to-date educational information."
+        )
     }
 
-    if intent not in allowed_intents:
+    if intent not in workflows:
         return (
             "Unknown education intent. "
             "Use one of: explanation, numerical, quiz, "
             "study_plan, current_information."
         )
 
-    return f"Education task identified: {intent}"
+    return workflows[intent]
 
 
 # ========================================
@@ -258,7 +282,8 @@ TOOLS = [
             "name": "education_router",
             "description": (
                 "Identify the type of education "
-                "task requested by the user."
+                "task requested by the user and "
+                "return the appropriate workflow."
             ),
             "parameters": {
                 "type": "object",
