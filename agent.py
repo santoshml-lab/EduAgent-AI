@@ -7,6 +7,8 @@ from tools import (
     calculator,
     web_search,
     education_router,
+    quiz_generator,
+
     TOOLS
 )
 
