@@ -73,6 +73,42 @@ def education_router(intent: str):
 
     return f"Education task identified: {intent}"
 
+def quiz_generator(
+    subject: str,
+    topic: str,
+    number_of_questions: int = 10,
+    difficulty: str = "medium"
+):
+    """
+    Prepare structured instructions for generating an educational quiz.
+    """
+
+    if number_of_questions < 1:
+        return "Quiz error: number_of_questions must be at least 1."
+
+    if number_of_questions > 20:
+        return "Quiz error: maximum 20 questions are allowed."
+
+    allowed_difficulties = {
+        "easy",
+        "medium",
+        "hard"
+    }
+
+    if difficulty.lower() not in allowed_difficulties:
+        return (
+            "Quiz error: difficulty must be easy, medium, or hard."
+        )
+
+    return (
+        f"Create a {number_of_questions}-question quiz.\n"
+        f"Subject: {subject}\n"
+        f"Topic: {topic}\n"
+        f"Difficulty: {difficulty.lower()}\n\n"
+        "Include clear questions and options where appropriate. "
+        "Provide an answer key at the end."
+    )
+
 
 TOOLS = [
     {
@@ -143,6 +179,47 @@ TOOLS = [
             }
         }
     }
+
+    {
+    "type": "function",
+    "function": {
+        "name": "quiz_generator",
+        "description": (
+            "Generate a structured educational quiz "
+            "for a given subject and topic."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subject": {
+                    "type": "string",
+                    "description": "The academic subject."
+                },
+                "topic": {
+                    "type": "string",
+                    "description": "The topic for the quiz."
+                },
+                "number_of_questions": {
+                    "type": "integer",
+                    "description": "Number of quiz questions."
+                },
+                "difficulty": {
+                    "type": "string",
+                    "enum": [
+                        "easy",
+                        "medium",
+                        "hard"
+                    ],
+                    "description": "Quiz difficulty level."
+                }
+            },
+            "required": [
+                "subject",
+                "topic"
+            ]
+        }
+    }
+},
 ]
 
 
