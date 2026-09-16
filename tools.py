@@ -139,6 +139,56 @@ def quiz_generator(
 
 
 # ========================================
+# Study Plan Generator
+# ========================================
+def study_plan_generator(
+    subject: str,
+    days: int,
+    hours_per_day: float,
+    topics: str = ""
+):
+    """
+    Prepare structured instructions for
+    generating a personalized educational
+    study plan.
+    """
+
+    if days < 1:
+        return (
+            "Study plan error: days must be "
+            "at least 1."
+        )
+
+    if days > 30:
+        return (
+            "Study plan error: maximum 30 days "
+            "are allowed."
+        )
+
+    if hours_per_day <= 0:
+        return (
+            "Study plan error: hours_per_day "
+            "must be greater than 0."
+        )
+
+    if hours_per_day > 12:
+        return (
+            "Study plan error: hours_per_day "
+            "cannot exceed 12."
+        )
+
+    return (
+        f"Create a {days}-day study plan.\n"
+        f"Subject: {subject}\n"
+        f"Study time per day: {hours_per_day} hours\n"
+        f"Topics: {topics if topics else 'Not specified'}\n\n"
+        "Create a practical day-by-day study schedule. "
+        "Include learning, revision, practice, and "
+        "self-assessment where appropriate."
+    )
+
+
+# ========================================
 # Tool Definitions
 # ========================================
 TOOLS = [
@@ -281,6 +331,57 @@ TOOLS = [
                 "required": [
                     "subject",
                     "topic"
+                ]
+            }
+        }
+    },
+
+    # ------------------------------------
+    # Study Plan Generator
+    # ------------------------------------
+    {
+        "type": "function",
+        "function": {
+            "name": "study_plan_generator",
+            "description": (
+                "Generate a structured educational "
+                "study plan for a subject."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": (
+                            "The academic subject."
+                        )
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": (
+                            "Number of days available "
+                            "for study."
+                        )
+                    },
+                    "hours_per_day": {
+                        "type": "number",
+                        "description": (
+                            "Available study hours "
+                            "per day."
+                        )
+                    },
+                    "topics": {
+                        "type": "string",
+                        "description": (
+                            "Topics that should be "
+                            "included in the study plan."
+                        )
+                    }
+                },
+                "required": [
+                    "subject",
+                    "days",
+                    "hours_per_day"
                 ]
             }
         }
