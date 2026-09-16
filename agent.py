@@ -8,6 +8,7 @@ from tools import (
     web_search,
     education_router,
     quiz_generator,
+    study_plan_generator,
     TOOLS
 )
 
@@ -46,7 +47,9 @@ def ask_agent(question: str):
                 "10. Supported education intents are: explanation, "
                 "numerical, quiz, study_plan, current_information.\n"
                 "11. When the education intent is quiz, use "
-                "quiz_generator before generating the quiz."
+                "quiz_generator before generating the quiz.\n"
+                "12. When the education intent is study_plan, use "
+                "study_plan_generator before generating the study plan."
             ),
         },
         {
@@ -281,6 +284,35 @@ def ask_agent(question: str):
 
                     result = (
                         f"Quiz generator tool error: {str(e)}"
+                    )
+
+            # ========================================
+            # Study Plan Generator
+            # ========================================
+            elif tool_name == "study_plan_generator":
+
+                try:
+
+                    subject = arguments["subject"]
+                    days = arguments["days"]
+                    hours_per_day = arguments["hours_per_day"]
+
+                    topics = arguments.get(
+                        "topics",
+                        ""
+                    )
+
+                    result = study_plan_generator(
+                        subject=subject,
+                        days=days,
+                        hours_per_day=hours_per_day,
+                        topics=topics
+                    )
+
+                except Exception as e:
+
+                    result = (
+                        f"Study plan generator tool error: {str(e)}"
                     )
 
             # ========================================
