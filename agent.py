@@ -29,27 +29,23 @@ def ask_agent(question: str):
                 "Answer questions clearly and accurately.\n\n"
 
                 "TOOL RULES:\n"
-                "1. Use calculator whenever mathematical calculation "
-                "is required.\n"
-                "2. Use web_search whenever current, recent, or "
-                "up-to-date information is required.\n"
-                "3. You may use more than one tool when necessary.\n"
-                "4. Use the result of one tool together with another "
-                "tool when the question requires it.\n"
-                "5. Base web-search answers only on retrieved results.\n"
-                "6. Do not invent facts, sources, URLs, or citations.\n"
-                "7. For web-search answers, refer to sources as "
-                "[Source 1], [Source 2], etc.\n"
-                "8. If the available information is insufficient, "
-                "say so instead of guessing.\n"
-                "9. For education-related requests, use education_router "
-                "to identify the task type before answering.\n"
-                "10. Supported education intents are: explanation, "
-                "numerical, quiz, study_plan, current_information.\n"
-                "11. When the education intent is quiz, use "
-                "quiz_generator before generating the quiz.\n"
-                "12. When the education intent is study_plan, use "
-                "study_plan_generator before generating the study plan."
+                "1. For every education-related question, education_router "
+                "must be called first.\n"
+                "2. Do not call calculator, web_search, quiz_generator, "
+                "or study_plan_generator before education_router.\n"
+                "3. For numerical questions, use calculator after routing.\n"
+                "4. For quiz requests, use quiz_generator after routing.\n"
+                "5. For study-plan requests, use study_plan_generator after routing.\n"
+                "6. For current-information requests, use web_search after routing.\n"
+                "7. For explanation requests, answer after routing without "
+                "another tool unless one is genuinely required.\n"
+                "8. You may use more than one tool when necessary.\n"
+                "9. Use the result of one tool together with another tool "
+                "when required.\n"
+                "10. Base web-search answers only on retrieved results.\n"
+                "11. Do not invent facts, sources, URLs, or citations.\n"
+                "12. If available information is insufficient, say so "
+                "instead of guessing.\n"
             ),
         },
         {
@@ -61,9 +57,6 @@ def ask_agent(question: str):
     web_sources = []
     next_source_id = 1
 
-    # ========================================
-    # Tool Execution Trace
-    # ========================================
     tool_trace = []
 
     # ========================================
@@ -354,4 +347,4 @@ def ask_agent(question: str):
                     "tool_call_id": tool_call.id,
                     "content": result,
                 }
-            )
+                                )
