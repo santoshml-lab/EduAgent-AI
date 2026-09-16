@@ -97,6 +97,9 @@ def ask_agent(question: str):
                 "I could not generate a final answer."
             )
 
+            # ========================================
+            # Add Web Sources
+            # ========================================
             if web_sources:
 
                 final_answer += "\n\n## Sources\n\n"
@@ -145,27 +148,14 @@ def ask_agent(question: str):
             # ========================================
             # Record Tool Execution
             # ========================================
-            tool_trace.append({
-            "step": len(tool_trace) + 1,
-            "tool": tool_name,
-            "status": "running",
-            "arguments": tool_call.function.arguments
-})
+            trace_entry = {
+                "step": len(tool_trace) + 1,
+                "tool": tool_name,
+                "status": "running",
+                "arguments": tool_call.function.arguments
+            }
 
-           # Execute tool
-           tool_result = available_tools[tool_name](**arguments)
-
-           # Mark successful execution
-           tool_trace[-1]["status"] = "success"
-            
-            
-
-            
-                
-                    
-                    
-                
-            
+            tool_trace.append(trace_entry)
 
             # ========================================
             # Parse Arguments
@@ -182,6 +172,8 @@ def ask_agent(question: str):
                     "Tool error: invalid JSON arguments "
                     "provided by the AI."
                 )
+
+                tool_trace[-1]["status"] = "error"
 
                 messages.append(
                     {
@@ -354,7 +346,27 @@ def ask_agent(question: str):
                 )
 
             # ========================================
-            # Send Tool Result Back
+            # Update Tool Status
+            # ========================================
+            if result:
+
+                if (
+                    isinstance(result, str)
+                    and (
+                        "tool error" in result.lower()
+                        or "error:" in result.lower()
+                    )
+                ):
+                    tool_trace[-1]["status"] = "error"
+                else:
+                    tool_trace[-1]["status"] = "success"
+
+            else:
+
+                tool_trace[-1]["status"] = "success"
+
+            # ========================================
+            # Send Tool Result Back to LLM
             # ========================================
             messages.append(
                 {
@@ -362,4 +374,4 @@ def ask_agent(question: str):
                     "tool_call_id": tool_call.id,
                     "content": result,
                 }
-                                )
+            )
