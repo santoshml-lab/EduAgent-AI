@@ -18,9 +18,13 @@ def home():
 
 @app.post("/ask")
 def ask_question(data: Question):
-    answer = ask_agent(data.question)
+
+    result = ask_agent(
+        data.question
+    )
 
     return {
         "question": data.question,
-        "answer": answer
+        "answer": result["answer"],
+        "tool_trace": result["tool_trace"]
     }
