@@ -47,19 +47,31 @@ def ask_agent(question: str):
     # Agent loop
     while True:
 
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
-        )
+        # --------------------------------
+        # Groq API Error Handling
+        # --------------------------------
+        try:
+            response = client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto",
+            )
+
+        except Exception as e:
+            return (
+                "EduAgent AI could not contact the AI service. "
+                f"Error: {str(e)}"
+            )
 
         message = response.choices[0].message
 
         # Agent has finished
         if not message.tool_calls:
 
-            final_answer = message.content
+            final_answer = message.content or (
+                "I could not generate a final answer."
+            )
 
             if web_sources:
                 final_answer += "\n\n## Sources\n\n"
@@ -97,44 +109,96 @@ def ask_agent(question: str):
 
             tool_name = tool_call.function.name
 
-            arguments = json.loads(
-                tool_call.function.arguments
-            )
+            # --------------------------------
+            # Tool Argument Error Handling
+            # --------------------------------
+            try:
+                arguments = json.loads(
+                    tool_call.function.arguments
+                )
 
+            except Exception:
+                result = (
+                    "Tool error: invalid JSON arguments "
+                    "provided by the AI."
+                )
+
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": result,
+                    }
+                )
+
+                continue
+
+            # --------------------------------
+            # Calculator
+            # --------------------------------
             if tool_name == "calculator":
 
-                result = calculator(
-                    arguments["expression"]
-                )
+                try:
+                    expression = arguments["expression"]
 
+                    result = calculator(
+                        expression
+                    )
+
+                except Exception as e:
+                    result = (
+                        f"Calculator tool error: {str(e)}"
+                    )
+
+            # --------------------------------
+            # Web Search
+            # --------------------------------
             elif tool_name == "web_search":
 
-                result = web_search(
-                    arguments["query"]
-                )
-
                 try:
-                    parsed_result = json.loads(result)
+                    query = arguments["query"]
 
-                    if isinstance(parsed_result, list):
+                    result = web_search(
+                        query
+                    )
 
-                        for source in parsed_result:
-                            source["source_id"] = next_source_id
-                            next_source_id += 1
+                    try:
+                        parsed_result = json.loads(result)
 
-                        result = json.dumps(
-                            parsed_result,
-                            ensure_ascii=False
-                        )
+                        if isinstance(parsed_result, list):
 
-                        web_sources.extend(parsed_result)
+                            for source in parsed_result:
+                                source["source_id"] = (
+                                    next_source_id
+                                )
 
-                except Exception:
-                    pass
+                                next_source_id += 1
 
+                            result = json.dumps(
+                                parsed_result,
+                                ensure_ascii=False
+                            )
+
+                            web_sources.extend(
+                                parsed_result
+                            )
+
+                    except Exception:
+                        pass
+
+                except Exception as e:
+                    result = (
+                        f"Web search tool error: {str(e)}"
+                    )
+
+            # --------------------------------
+            # Unknown Tool
+            # --------------------------------
             else:
 
-                result = "Unknown tool."
+                result = (
+                    f"Unknown tool requested: {tool_name}"
+                )
 
             messages.append(
                 {
