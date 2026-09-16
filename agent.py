@@ -8,13 +8,14 @@ from tools import (
     web_search,
     education_router,
     quiz_generator,
-
     TOOLS
 )
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 
 def ask_agent(question: str):
@@ -43,7 +44,9 @@ def ask_agent(question: str):
                 "9. For education-related requests, use education_router "
                 "to identify the task type before answering.\n"
                 "10. Supported education intents are: explanation, "
-                "numerical, quiz, study_plan, current_information."
+                "numerical, quiz, study_plan, current_information.\n"
+                "11. When the education intent is quiz, use "
+                "quiz_generator before generating the quiz."
             ),
         },
         {
@@ -61,7 +64,7 @@ def ask_agent(question: str):
     while True:
 
         # ========================================
-        # Groq API Error Handling
+        # Groq API
         # ========================================
         try:
 
@@ -82,7 +85,7 @@ def ask_agent(question: str):
         message = response.choices[0].message
 
         # ========================================
-        # Agent has finished
+        # Agent Finished
         # ========================================
         if not message.tool_calls:
 
@@ -105,7 +108,7 @@ def ask_agent(question: str):
             return final_answer
 
         # ========================================
-        # Add assistant tool calls
+        # Add Assistant Tool Calls
         # ========================================
         messages.append(
             {
@@ -126,14 +129,14 @@ def ask_agent(question: str):
         )
 
         # ========================================
-        # Execute every requested tool
+        # Execute Tools
         # ========================================
         for tool_call in message.tool_calls:
 
             tool_name = tool_call.function.name
 
             # ========================================
-            # Tool Argument Error Handling
+            # Parse Arguments
             # ========================================
             try:
 
@@ -248,6 +251,39 @@ def ask_agent(question: str):
                     )
 
             # ========================================
+            # Quiz Generator
+            # ========================================
+            elif tool_name == "quiz_generator":
+
+                try:
+
+                    subject = arguments["subject"]
+                    topic = arguments["topic"]
+
+                    number_of_questions = arguments.get(
+                        "number_of_questions",
+                        10
+                    )
+
+                    difficulty = arguments.get(
+                        "difficulty",
+                        "medium"
+                    )
+
+                    result = quiz_generator(
+                        subject=subject,
+                        topic=topic,
+                        number_of_questions=number_of_questions,
+                        difficulty=difficulty
+                    )
+
+                except Exception as e:
+
+                    result = (
+                        f"Quiz generator tool error: {str(e)}"
+                    )
+
+            # ========================================
             # Unknown Tool
             # ========================================
             else:
@@ -257,7 +293,7 @@ def ask_agent(question: str):
                 )
 
             # ========================================
-            # Send tool result back to the agent
+            # Send Tool Result Back
             # ========================================
             messages.append(
                 {
@@ -265,4 +301,4 @@ def ask_agent(question: str):
                     "tool_call_id": tool_call.id,
                     "content": result,
                 }
-                                )
+            )
