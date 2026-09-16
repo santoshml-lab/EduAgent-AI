@@ -3,7 +3,12 @@ import os
 import json
 from dotenv import load_dotenv
 
-from tools import calculator, web_search, TOOLS
+from tools import (
+    calculator,
+    web_search,
+    education_router,
+    TOOLS
+)
 
 load_dotenv()
 
@@ -32,11 +37,11 @@ def ask_agent(question: str):
                 "7. For web-search answers, refer to sources as "
                 "[Source 1], [Source 2], etc.\n"
                 "8. If the available information is insufficient, "
-                "say so instead of guessing."
+                "say so instead of guessing.\n"
                 "9. For education-related requests, use education_router "
                 "to identify the task type before answering.\n"
-                "10. Supported education intents are: explanation, numerical, "
-                "quiz, study_plan, current_information."
+                "10. Supported education intents are: explanation, "
+                "numerical, quiz, study_plan, current_information."
             ),
         },
         {
@@ -48,13 +53,16 @@ def ask_agent(question: str):
     web_sources = []
     next_source_id = 1
 
-    # Agent loop
+    # ========================================
+    # Agent Loop
+    # ========================================
     while True:
 
-        # --------------------------------
+        # ========================================
         # Groq API Error Handling
-        # --------------------------------
+        # ========================================
         try:
+
             response = client.chat.completions.create(
                 model="openai/gpt-oss-20b",
                 messages=messages,
@@ -63,6 +71,7 @@ def ask_agent(question: str):
             )
 
         except Exception as e:
+
             return (
                 "EduAgent AI could not contact the AI service. "
                 f"Error: {str(e)}"
@@ -70,7 +79,9 @@ def ask_agent(question: str):
 
         message = response.choices[0].message
 
+        # ========================================
         # Agent has finished
+        # ========================================
         if not message.tool_calls:
 
             final_answer = message.content or (
@@ -78,9 +89,11 @@ def ask_agent(question: str):
             )
 
             if web_sources:
+
                 final_answer += "\n\n## Sources\n\n"
 
                 for source in web_sources:
+
                     final_answer += (
                         f"[Source {source['source_id']}] "
                         f"{source['title']}\n"
@@ -89,7 +102,9 @@ def ask_agent(question: str):
 
             return final_answer
 
+        # ========================================
         # Add assistant tool calls
+        # ========================================
         messages.append(
             {
                 "role": "assistant",
@@ -108,20 +123,24 @@ def ask_agent(question: str):
             }
         )
 
+        # ========================================
         # Execute every requested tool
+        # ========================================
         for tool_call in message.tool_calls:
 
             tool_name = tool_call.function.name
 
-            # --------------------------------
+            # ========================================
             # Tool Argument Error Handling
-            # --------------------------------
+            # ========================================
             try:
+
                 arguments = json.loads(
                     tool_call.function.arguments
                 )
 
             except Exception:
+
                 result = (
                     "Tool error: invalid JSON arguments "
                     "provided by the AI."
@@ -137,12 +156,13 @@ def ask_agent(question: str):
 
                 continue
 
-            # --------------------------------
+            # ========================================
             # Calculator
-            # --------------------------------
+            # ========================================
             if tool_name == "calculator":
 
                 try:
+
                     expression = arguments["expression"]
 
                     result = calculator(
@@ -150,16 +170,18 @@ def ask_agent(question: str):
                     )
 
                 except Exception as e:
+
                     result = (
                         f"Calculator tool error: {str(e)}"
                     )
 
-            # --------------------------------
+            # ========================================
             # Web Search
-            # --------------------------------
+            # ========================================
             elif tool_name == "web_search":
 
                 try:
+
                     query = arguments["query"]
 
                     result = web_search(
@@ -167,11 +189,18 @@ def ask_agent(question: str):
                     )
 
                     try:
-                        parsed_result = json.loads(result)
 
-                        if isinstance(parsed_result, list):
+                        parsed_result = json.loads(
+                            result
+                        )
+
+                        if isinstance(
+                            parsed_result,
+                            list
+                        ):
 
                             for source in parsed_result:
+
                                 source["source_id"] = (
                                     next_source_id
                                 )
@@ -188,46 +217,50 @@ def ask_agent(question: str):
                             )
 
                     except Exception:
+
                         pass
 
                 except Exception as e:
+
                     result = (
                         f"Web search tool error: {str(e)}"
                     )
 
+            # ========================================
+            # Education Router
+            # ========================================
             elif tool_name == "education_router":
 
-    try:
-        intent = arguments["intent"]
+                try:
 
-        result = education_router(
-            intent
-        )
+                    intent = arguments["intent"]
 
-    except Exception as e:
-        result = (
-            f"Education router error: {str(e)}"
-        )
-                    
+                    result = education_router(
+                        intent
+                    )
 
-    
-        
+                except Exception as e:
 
-            
+                    result = (
+                        f"Education router error: {str(e)}"
+                    )
 
-            # --------------------------------
+            # ========================================
             # Unknown Tool
-            # --------------------------------
+            # ========================================
             else:
 
                 result = (
                     f"Unknown tool requested: {tool_name}"
                 )
 
+            # ========================================
+            # Send tool result back to the agent
+            # ========================================
             messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "content": result,
                 }
-            )
+                                )
