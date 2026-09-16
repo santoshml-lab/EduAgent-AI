@@ -62,6 +62,11 @@ def ask_agent(question: str):
     next_source_id = 1
 
     # ========================================
+    # Tool Execution Trace
+    # ========================================
+    tool_trace = []
+
+    # ========================================
     # Agent Loop
     # ========================================
     while True:
@@ -80,10 +85,13 @@ def ask_agent(question: str):
 
         except Exception as e:
 
-            return (
-                "EduAgent AI could not contact the AI service. "
-                f"Error: {str(e)}"
-            )
+            return {
+                "answer": (
+                    "EduAgent AI could not contact the AI service. "
+                    f"Error: {str(e)}"
+                ),
+                "tool_trace": tool_trace
+            }
 
         message = response.choices[0].message
 
@@ -108,7 +116,10 @@ def ask_agent(question: str):
                         f"{source['url']}\n\n"
                     )
 
-            return final_answer
+            return {
+                "answer": final_answer,
+                "tool_trace": tool_trace
+            }
 
         # ========================================
         # Add Assistant Tool Calls
@@ -137,6 +148,16 @@ def ask_agent(question: str):
         for tool_call in message.tool_calls:
 
             tool_name = tool_call.function.name
+
+            # ========================================
+            # Record Tool Execution
+            # ========================================
+            tool_trace.append(
+                {
+                    "tool": tool_name,
+                    "arguments": tool_call.function.arguments
+                }
+            )
 
             # ========================================
             # Parse Arguments
