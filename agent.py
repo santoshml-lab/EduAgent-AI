@@ -151,6 +151,15 @@ def ask_agent(question: str):
             "status": "running",
             "arguments": tool_call.function.arguments
 })
+
+           # Execute tool
+           tool_result = available_tools[tool_name](**arguments)
+
+           # Mark successful execution
+           tool_trace[-1]["status"] = "success"
+            
+            
+
             
                 
                     
