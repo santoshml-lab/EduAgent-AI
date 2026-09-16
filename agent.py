@@ -20,18 +20,19 @@ def ask_agent(question: str):
                 "Answer questions clearly and accurately.\n\n"
 
                 "TOOL RULES:\n"
-                "1. Use the calculator tool whenever mathematical calculation "
+                "1. Use calculator whenever mathematical calculation "
                 "is required.\n"
-                "2. Use the web_search tool whenever current, recent, or "
+                "2. Use web_search whenever current, recent, or "
                 "up-to-date information is required.\n"
-                "3. When using web search, base your answer only on the "
-                "retrieved search results.\n"
-                "4. Do not invent facts, sources, URLs, or citations.\n"
-                "5. For web-search answers, refer to sources as "
+                "3. You may use more than one tool when necessary.\n"
+                "4. Use the result of one tool together with another "
+                "tool when the question requires it.\n"
+                "5. Base web-search answers only on retrieved results.\n"
+                "6. Do not invent facts, sources, URLs, or citations.\n"
+                "7. For web-search answers, refer to sources as "
                 "[Source 1], [Source 2], etc.\n"
-                "6. Use only the source IDs provided by the web_search tool.\n"
-                "7. If the retrieved sources do not provide enough evidence, "
-                "say that the available sources are insufficient rather than guessing."
+                "8. If the available information is insufficient, "
+                "say so instead of guessing."
             ),
         },
         {
@@ -40,124 +41,94 @@ def ask_agent(question: str):
         },
     ]
 
-    # First call: AI decides whether a tool is needed
-    response = client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=messages,
-        tools=TOOLS,
-        tool_choice="auto",
-    )
-
-    message = response.choices[0].message
-
-    # No tool needed
-    if not message.tool_calls:
-        return message.content
-
-    # Store actual sources returned by web search
     web_sources = []
 
-    # Add assistant tool-call message
-    messages.append(
-        {
-            "role": "assistant",
-            "content": message.content,
-            "tool_calls": [
-                {
-                    "id": tool_call.id,
-                    "type": "function",
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments,
-                    },
-                }
-                for tool_call in message.tool_calls
-            ],
-        }
-    )
+    # Agent loop
+    while True:
 
-    # Execute requested tools
-    for tool_call in message.tool_calls:
-
-        tool_name = tool_call.function.name
-
-        arguments = json.loads(
-            tool_call.function.arguments
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=messages,
+            tools=TOOLS,
+            tool_choice="auto",
         )
 
-        if tool_name == "calculator":
+        message = response.choices[0].message
 
-            result = calculator(
-                arguments["expression"]
-            )
+        # Agent has finished
+        if not message.tool_calls:
 
-        elif tool_name == "web_search":
+            final_answer = message.content
 
-            result = web_search(
-                arguments["query"]
-            )
+            if web_sources:
+                final_answer += "\n\n## Sources\n\n"
 
-            # Save actual sources returned by Tavily
-            try:
-                parsed_result = json.loads(result)
+                for source in web_sources:
+                    final_answer += (
+                        f"[Source {source['source_id']}] "
+                        f"{source['title']}\n"
+                        f"{source['url']}\n\n"
+                    )
 
-                if isinstance(parsed_result, list):
-                    web_sources.extend(parsed_result)
+            return final_answer
 
-            except Exception:
-                pass
-
-        else:
-
-            result = "Unknown tool."
-
-        # Send tool result back to AI
+        # Add assistant tool calls
         messages.append(
             {
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": result,
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments,
+                        },
+                    }
+                    for tool_call in message.tool_calls
+                ],
             }
         )
 
-    # Final answer instruction
-    messages.append(
-        {
-            "role": "system",
-            "content": (
-                "Now provide the final answer using only the tool results "
-                "already provided. Do not call any tools. "
-                "Do not invent facts, sources, or URLs. "
-                "When referring to web-search evidence, use the source IDs "
-                "provided by the tool results."
-            ),
-        }
-    )
+        # Execute every requested tool
+        for tool_call in message.tool_calls:
 
-    # Final call
-    final_response = client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=messages,
-        tool_choice="none",
-    )
+            tool_name = tool_call.function.name
 
-    final_answer = final_response.choices[0].message.content
+            arguments = json.loads(
+                tool_call.function.arguments
+            )
 
-    # Python adds the exact URLs returned by Tavily
-    if web_sources:
+            if tool_name == "calculator":
 
-        final_answer += "\n\n## Sources\n\n"
-
-        for source in web_sources:
-
-            source_id = source.get("source_id", "")
-            title = source.get("title", "")
-            url = source.get("url", "")
-
-            if title and url:
-                final_answer += (
-                    f"[Source {source_id}] {title}\n"
-                    f"{url}\n\n"
+                result = calculator(
+                    arguments["expression"]
                 )
 
-    return final_answer
+            elif tool_name == "web_search":
+
+                result = web_search(
+                    arguments["query"]
+                )
+
+                try:
+                    parsed_result = json.loads(result)
+
+                    if isinstance(parsed_result, list):
+                        web_sources.extend(parsed_result)
+
+                except Exception:
+                    pass
+
+            else:
+
+                result = "Unknown tool."
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result,
+                }
+            )
