@@ -42,7 +42,7 @@ def ask_agent(question: str):
     ]
 
     web_sources = []
-   next_source_id = 1
+    next_source_id = 1
 
     # Agent loop
     while True:
@@ -109,33 +109,28 @@ def ask_agent(question: str):
 
             elif tool_name == "web_search":
 
-    result = web_search(
-        arguments["query"]
-    )
+                result = web_search(
+                    arguments["query"]
+                )
 
-    try:
-        parsed_result = json.loads(result)
+                try:
+                    parsed_result = json.loads(result)
 
-        if isinstance(parsed_result, list):
+                    if isinstance(parsed_result, list):
 
-            for source in parsed_result:
-                source["source_id"] = next_source_id
-                next_source_id += 1
+                        for source in parsed_result:
+                            source["source_id"] = next_source_id
+                            next_source_id += 1
 
-            result = json.dumps(
-                parsed_result,
-                ensure_ascii=False
-            )
+                        result = json.dumps(
+                            parsed_result,
+                            ensure_ascii=False
+                        )
 
-            web_sources.extend(parsed_result)
+                        web_sources.extend(parsed_result)
 
-    except Exception:
-        pass
-
-            
-
-                
-                    
+                except Exception:
+                    pass
 
             else:
 
