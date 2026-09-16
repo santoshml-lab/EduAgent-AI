@@ -123,8 +123,28 @@ TOOLS = [
         }
     }
 
-
         {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": (
+                "Search the web for current, recent, or "
+                "up-to-date information."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The web search query."
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
+
+    {
         "type": "function",
         "function": {
             "name": "education_router",
@@ -152,9 +172,8 @@ TOOLS = [
                 "required": ["intent"]
             }
         }
-}
-        
-        
-        
-            
+    }
 ]
+
+
+        
