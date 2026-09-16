@@ -1,5 +1,13 @@
+import os
 import json
-from tavily import TavilyClient
+import serpapi
+from dotenv import load_dotenv
+
+load_dotenv()
+
+serpapi_client = serpapi.Client(
+    api_key=os.getenv("SERPAPI_KEY")
+)
 
 
 # ========================================
@@ -23,43 +31,45 @@ def calculator(expression: str):
 # Web Search Tool
 # ========================================
 def web_search(query: str):
+    """
+    Search the web using SerpApi Google Search.
+    Returns structured search results for the agent.
+    """
+
     try:
-        tavily = TavilyClient()
+        results = serpapi_client.search({
+            "engine": "google",
+            "q": query
+        })
 
-        response = tavily.search(
-            query=query,
-            search_depth="advanced",
-            max_results=5,
-            include_answer=False
-        )
+        organic_results = results.get("organic_results", [])
 
-        results = []
+        if not organic_results:
+            return json.dumps({
+                "error": "No search results found."
+            })
 
-        for index, item in enumerate(
-            response.get("results", []),
-            start=1
-        ):
-            results.append(
-                {
-                    "source_id": index,
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "content": item.get("content", "")
-                }
-            )
+        sources = []
 
-        return json.dumps(
-            results,
-            ensure_ascii=False
-        )
+        for index, result in enumerate(organic_results[:5], start=1):
+            sources.append({
+                "source_id": f"source_{index}",
+                "title": result.get("title", ""),
+                "url": result.get("link", ""),
+                "content": result.get("snippet", "")
+            })
+
+        return json.dumps(sources, ensure_ascii=False)
 
     except Exception as e:
-        return json.dumps(
-            {
-                "error": f"Web search failed: {str(e)}"
-            },
-            ensure_ascii=False
-        )
+        return json.dumps({
+            "error": f"Web search failed: {str(e)}"
+        })
+
+    
+        
+            
+            
 
 
 # ========================================
