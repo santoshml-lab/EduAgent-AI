@@ -1,6 +1,7 @@
 import json
 from tavily import TavilyClient
 
+
 def calculator(expression: str):
     try:
         result = eval(expression, {"__builtins__": {}}, {})
@@ -9,12 +10,6 @@ def calculator(expression: str):
     except Exception as e:
         return f"Calculator error: {str(e)}"
 
-
-
-    
-        
-    
-        
 
 def web_search(query: str):
     try:
@@ -55,6 +50,7 @@ def web_search(query: str):
             ensure_ascii=False
         )
 
+
 def education_router(intent: str):
     """
     Identify the type of education task requested by the user.
@@ -78,12 +74,6 @@ def education_router(intent: str):
     return f"Education task identified: {intent}"
 
 
-
-        
-
-        
-
-
 TOOLS = [
     {
         "type": "function",
@@ -102,28 +92,8 @@ TOOLS = [
             }
         }
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": (
-                "Search the web for current, recent, or "
-                "up-to-date information."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The web search query."
-                    }
-                },
-                "required": ["query"]
-            }
-        }
-    }
 
-        {
+    {
         "type": "function",
         "function": {
             "name": "web_search",
