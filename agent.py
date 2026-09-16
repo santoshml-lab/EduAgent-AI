@@ -33,6 +33,10 @@ def ask_agent(question: str):
                 "[Source 1], [Source 2], etc.\n"
                 "8. If the available information is insufficient, "
                 "say so instead of guessing."
+                "9. For education-related requests, use education_router "
+                "to identify the task type before answering.\n"
+                "10. Supported education intents are: explanation, numerical, "
+                "quiz, study_plan, current_information."
             ),
         },
         {
@@ -190,6 +194,26 @@ def ask_agent(question: str):
                     result = (
                         f"Web search tool error: {str(e)}"
                     )
+
+            elif tool_name == "education_router":
+
+    try:
+        intent = arguments["intent"]
+
+        result = education_router(
+            intent
+        )
+
+    except Exception as e:
+        result = (
+            f"Education router error: {str(e)}"
+        )
+                    
+
+    
+        
+
+            
 
             # --------------------------------
             # Unknown Tool
