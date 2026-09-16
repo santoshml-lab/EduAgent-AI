@@ -145,12 +145,18 @@ def ask_agent(question: str):
             # ========================================
             # Record Tool Execution
             # ========================================
-            tool_trace.append(
-                {
-                    "tool": tool_name,
-                    "arguments": tool_call.function.arguments
-                }
-            )
+            tool_trace.append({
+            "step": len(tool_trace) + 1,
+            "tool": tool_name,
+            "status": "running",
+            "arguments": tool_call.function.arguments
+})
+            
+                
+                    
+                    
+                
+            
 
             # ========================================
             # Parse Arguments
