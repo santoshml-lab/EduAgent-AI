@@ -2,15 +2,26 @@ import json
 from tavily import TavilyClient
 
 
+# ========================================
+# Calculator Tool
+# ========================================
 def calculator(expression: str):
     try:
-        result = eval(expression, {"__builtins__": {}}, {})
+        result = eval(
+            expression,
+            {"__builtins__": {}},
+            {}
+        )
+
         return f"Calculation result: {result}"
 
     except Exception as e:
         return f"Calculator error: {str(e)}"
 
 
+# ========================================
+# Web Search Tool
+# ========================================
 def web_search(query: str):
     try:
         tavily = TavilyClient()
@@ -51,9 +62,13 @@ def web_search(query: str):
         )
 
 
+# ========================================
+# Education Router
+# ========================================
 def education_router(intent: str):
     """
-    Identify the type of education task requested by the user.
+    Identify the type of education task
+    requested by the user.
     """
 
     allowed_intents = {
@@ -73,6 +88,10 @@ def education_router(intent: str):
 
     return f"Education task identified: {intent}"
 
+
+# ========================================
+# Quiz Generator
+# ========================================
 def quiz_generator(
     subject: str,
     topic: str,
@@ -80,14 +99,21 @@ def quiz_generator(
     difficulty: str = "medium"
 ):
     """
-    Prepare structured instructions for generating an educational quiz.
+    Prepare structured instructions for
+    generating an educational quiz.
     """
 
     if number_of_questions < 1:
-        return "Quiz error: number_of_questions must be at least 1."
+        return (
+            "Quiz error: number_of_questions "
+            "must be at least 1."
+        )
 
     if number_of_questions > 20:
-        return "Quiz error: maximum 20 questions are allowed."
+        return (
+            "Quiz error: maximum 20 questions "
+            "are allowed."
+        )
 
     allowed_difficulties = {
         "easy",
@@ -97,7 +123,8 @@ def quiz_generator(
 
     if difficulty.lower() not in allowed_difficulties:
         return (
-            "Quiz error: difficulty must be easy, medium, or hard."
+            "Quiz error: difficulty must be "
+            "easy, medium, or hard."
         )
 
     return (
@@ -105,58 +132,83 @@ def quiz_generator(
         f"Subject: {subject}\n"
         f"Topic: {topic}\n"
         f"Difficulty: {difficulty.lower()}\n\n"
-        "Include clear questions and options where appropriate. "
+        "Include clear questions and options "
+        "where appropriate. "
         "Provide an answer key at the end."
     )
 
 
+# ========================================
+# Tool Definitions
+# ========================================
 TOOLS = [
+
+    # ------------------------------------
+    # Calculator
+    # ------------------------------------
     {
         "type": "function",
         "function": {
             "name": "calculator",
-            "description": "Perform mathematical calculations.",
+            "description": (
+                "Perform mathematical calculations."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "expression": {
                         "type": "string",
-                        "description": "Mathematical expression to calculate."
+                        "description": (
+                            "Mathematical expression "
+                            "to calculate."
+                        )
                     }
                 },
-                "required": ["expression"]
+                "required": [
+                    "expression"
+                ]
             }
         }
     },
 
+    # ------------------------------------
+    # Web Search
+    # ------------------------------------
     {
         "type": "function",
         "function": {
             "name": "web_search",
             "description": (
-                "Search the web for current, recent, or "
-                "up-to-date information."
+                "Search the web for current, "
+                "recent, or up-to-date information."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The web search query."
+                        "description": (
+                            "The web search query."
+                        )
                     }
                 },
-                "required": ["query"]
+                "required": [
+                    "query"
+                ]
             }
         }
     },
 
+    # ------------------------------------
+    # Education Router
+    # ------------------------------------
     {
         "type": "function",
         "function": {
             "name": "education_router",
             "description": (
-                "Identify the type of education task requested "
-                "by the user."
+                "Identify the type of education "
+                "task requested by the user."
             ),
             "parameters": {
                 "type": "object",
@@ -175,52 +227,68 @@ TOOLS = [
                         )
                     }
                 },
-                "required": ["intent"]
+                "required": [
+                    "intent"
+                ]
+            }
+        }
+    },
+
+    # ------------------------------------
+    # Quiz Generator
+    # ------------------------------------
+    {
+        "type": "function",
+        "function": {
+            "name": "quiz_generator",
+            "description": (
+                "Generate a structured educational "
+                "quiz for a given subject and topic."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": (
+                            "The academic subject."
+                        )
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": (
+                            "The topic for the quiz."
+                        )
+                    },
+                    "number_of_questions": {
+                        "type": "integer",
+                        "description": (
+                            "Number of quiz questions."
+                        )
+                    },
+                    "difficulty": {
+                        "type": "string",
+                        "enum": [
+                            "easy",
+                            "medium",
+                            "hard"
+                        ],
+                        "description": (
+                            "Quiz difficulty level."
+                        )
+                    }
+                },
+                "required": [
+                    "subject",
+                    "topic"
+                ]
             }
         }
     }
 
-    {
-    "type": "function",
-    "function": {
-        "name": "quiz_generator",
-        "description": (
-            "Generate a structured educational quiz "
-            "for a given subject and topic."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subject": {
-                    "type": "string",
-                    "description": "The academic subject."
-                },
-                "topic": {
-                    "type": "string",
-                    "description": "The topic for the quiz."
-                },
-                "number_of_questions": {
-                    "type": "integer",
-                    "description": "Number of quiz questions."
-                },
-                "difficulty": {
-                    "type": "string",
-                    "enum": [
-                        "easy",
-                        "medium",
-                        "hard"
-                    ],
-                    "description": "Quiz difficulty level."
-                }
-            },
-            "required": [
-                "subject",
-                "topic"
-            ]
-        }
-    }
-},
 ]
+
+                    
 
 
         
