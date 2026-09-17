@@ -20,10 +20,6 @@ client = Groq(
 )
 
 
-# ============================================================
-# Helper: Extract calculator expression
-# ============================================================
-
 def extract_calculation(question: str):
     """
     Detect common mathematical expressions from
@@ -34,11 +30,13 @@ def extract_calculation(question: str):
 
     # --------------------------------------------------------
     # Percentage of a number
-    # Example:
+    # Examples:
     # 25% of 2400
+    # 35 percent of 240 students
     # --------------------------------------------------------
     percentage_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*%\s*(?:of)\s*(\d+(?:\.\d+)?)",
+        r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s*(?:of)\s*"
+        r"(\d+(?:\.\d+)?)",
         text
     )
 
@@ -46,13 +44,75 @@ def extract_calculation(question: str):
         percentage = float(percentage_match.group(1))
         number = float(percentage_match.group(2))
 
-        expression = f"({percentage} / 100) * {number}"
+        return f"({percentage} / 100) * {number}"
 
-        return expression
+    # --------------------------------------------------------
+    # Percentage with total appearing BEFORE percentage
+    #
+    # Examples:
+    # 240 students and 35% are girls
+    # 500 people, 20% are children
+    # 100 students have 30% girls
+    # --------------------------------------------------------
+    reverse_percentage_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*"
+        r"(?:students?|people|persons?|children|items?|"
+        r"candidates?|employees?|customers?|members?)?"
+        r".{0,80}?"
+        r"(\d+(?:\.\d+)?)\s*(?:%|percent)",
+        text
+    )
+
+    if reverse_percentage_match:
+
+        number = float(
+            reverse_percentage_match.group(1)
+        )
+
+        percentage = float(
+            reverse_percentage_match.group(2)
+        )
+
+        # Avoid treating a percentage followed by another
+        # number as a reverse percentage calculation.
+        if percentage <= 100:
+
+            return (
+                f"({percentage} / 100) * {number}"
+            )
+
+    # --------------------------------------------------------
+    # Percentage with "out of"
+    #
+    # Example:
+    # 35% out of 240 students
+    # --------------------------------------------------------
+    out_of_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:%|percent)"
+        r".{0,30}?"
+        r"(?:out of|from|among)\s*"
+        r"(\d+(?:\.\d+)?)",
+        text
+    )
+
+    if out_of_match:
+
+        percentage = float(
+            out_of_match.group(1)
+        )
+
+        number = float(
+            out_of_match.group(2)
+        )
+
+        return (
+            f"({percentage} / 100) * {number}"
+        )
 
     # --------------------------------------------------------
     # Basic arithmetic expressions
-    # Example:
+    #
+    # Examples:
     # 125 * 48
     # 500 + 250
     # 1000 / 25
@@ -65,13 +125,24 @@ def extract_calculation(question: str):
     )
 
     if arithmetic_match:
+
         number1 = arithmetic_match.group(1)
         operator = arithmetic_match.group(2)
         number2 = arithmetic_match.group(3)
 
-        return f"{number1} {operator} {number2}"
+        return (
+            f"{number1} {operator} {number2}"
+        )
 
     return None
+
+
+
+    
+            
+
+    
+        
 
 
 # ============================================================
