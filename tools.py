@@ -96,13 +96,17 @@ def web_search(query: str):
 def education_router(intents):
 
     valid_intents = [
-        "explanation",
-        "numerical",
-        "quiz",
-        "study_plan",
-        "current_information",
-        "weak_topic"
+       "explanation",
+       "numerical",
+       "quiz",
+       "study_plan",
+       "current_information",
+       "weak_topic",
+       "quiz_result"
     ]
+
+    
+        
 
     if isinstance(
         intents,
