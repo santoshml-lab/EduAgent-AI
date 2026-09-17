@@ -1,6 +1,7 @@
 from groq import Groq
 import os
 import json
+import re
 from dotenv import load_dotenv
 
 from tools import (
@@ -14,417 +15,719 @@ from tools import (
 
 load_dotenv()
 
-
-# ========================================
-# Groq Client
-# ========================================
-
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
 
-# ========================================
-# Main Agent
-# ========================================
+# ============================================================
+# Helper: Extract calculator expression
+# ============================================================
 
-def ask_agent(question: str):
+def extract_calculation(question: str):
+    """
+    Detect common mathematical expressions from
+    natural-language questions.
+    """
 
-    messages = [
+    text = question.lower().strip()
+
+    # --------------------------------------------------------
+    # Percentage of a number
+    # Example:
+    # 25% of 2400
+    # --------------------------------------------------------
+    percentage_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*%\s*(?:of)\s*(\d+(?:\.\d+)?)",
+        text
+    )
+
+    if percentage_match:
+        percentage = float(percentage_match.group(1))
+        number = float(percentage_match.group(2))
+
+        expression = f"({percentage} / 100) * {number}"
+
+        return expression
+
+    # --------------------------------------------------------
+    # Basic arithmetic expressions
+    # Example:
+    # 125 * 48
+    # 500 + 250
+    # 1000 / 25
+    # --------------------------------------------------------
+    arithmetic_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*"
+        r"([\+\-\*\/])\s*"
+        r"(\d+(?:\.\d+)?)",
+        text
+    )
+
+    if arithmetic_match:
+        number1 = arithmetic_match.group(1)
+        operator = arithmetic_match.group(2)
+        number2 = arithmetic_match.group(3)
+
+        return f"{number1} {operator} {number2}"
+
+    return None
+
+
+# ============================================================
+# Helper: Extract web-search query
+# ============================================================
+
+def extract_web_query(question: str):
+    """
+    For current/latest/recent questions, the original
+    user question is a safe search query.
+    """
+
+    return question.strip()
+
+
+# ============================================================
+# Helper: Execute Calculator
+# ============================================================
+
+def execute_calculator(question: str):
+
+    expression = extract_calculation(question)
+
+    if not expression:
+        return {
+            "success": False,
+            "result": (
+                "Calculator could not identify a mathematical "
+                "expression from the question."
+            )
+        }
+
+    try:
+        result = calculator(expression)
+
+        return {
+            "success": True,
+            "expression": expression,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "expression": expression,
+            "result": f"Calculator error: {str(e)}"
+        }
+
+
+# ============================================================
+# Helper: Execute Web Search
+# ============================================================
+
+def execute_web_search(question: str):
+
+    query = extract_web_query(question)
+
+    try:
+        result = web_search(query)
+
+        return {
+            "success": True,
+            "query": query,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "query": query,
+            "result": f"Web search error: {str(e)}"
+        }
+
+
+# ============================================================
+# Helper: Execute Quiz Generator
+# ============================================================
+
+def execute_quiz(question: str):
+
+    # Ask Groq to extract quiz parameters.
+    # This is NOT the main tool orchestration.
+    # The router has already identified the quiz intent.
+
+    extraction_prompt = [
         {
             "role": "system",
             "content": (
-                "You are EduAgent AI, an intelligent education assistant. "
-                "Answer questions clearly, accurately, and using the "
-                "appropriate tools.\n\n"
-
-                "IMPORTANT TOOL RULES:\n"
-
-                "1. For every education-related question, "
-                "education_router MUST be called FIRST.\n"
-
-                "2. education_router supports MULTIPLE intents. "
-                "For a multi-task question, return ALL applicable "
-                "intents in the intents array.\n"
-
-                "3. For example, if the user asks "
-                "'What is 25% of 2400 and what are the latest AI "
-                "developments in 2026?', the router should identify "
-                "BOTH numerical and current_information.\n"
-
-                "4. After education_router, ALL required tools for "
-                "the identified intents must be executed before "
-                "generating the final answer.\n"
-
-                "5. Numerical calculations MUST use calculator.\n"
-                "Convert natural-language calculations into valid "
-                "mathematical expressions before calling calculator. "
-                "For example, convert '25% of 2400' into "
-                "'0.25 * 2400'.\n"
-
-                "6. Current, latest, recent, today's, or 2026 "
-                "information MUST use web_search.\n"
-
-                "7. Quiz requests MUST use quiz_generator.\n"
-
-                "8. Study-plan requests MUST use "
-                "study_plan_generator.\n"
-
-                "9. Explanation-only questions may be answered "
-                "after education_router without another tool when "
-                "no tool is genuinely required.\n"
-
-                "10. NEVER stop after using only one tool when "
-                "another required task remains incomplete.\n"
-
-                "11. Use the results of ALL executed tools when "
-                "creating the final answer.\n"
-
-                "12. For web-search answers, use only information "
-                "returned by web_search. Do not invent facts, "
-                "sources, URLs, or citations.\n"
-
-                "13. If available information is insufficient, "
-                "clearly say so instead of guessing.\n"
-            ),
+                "Extract quiz parameters from the user's request. "
+                "Return ONLY valid JSON with these keys: "
+                "subject, topic, number_of_questions, difficulty. "
+                "number_of_questions must be an integer between 1 and 20. "
+                "difficulty must be easy, medium, or hard. "
+                "If not specified, use 10 and medium."
+            )
         },
         {
             "role": "user",
-            "content": question,
-        },
+            "content": question
+        }
     ]
 
-    web_sources = []
-    next_source_id = 1
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=extraction_prompt,
+            temperature=0
+        )
+
+        content = response.choices[0].message.content or "{}"
+
+        # Remove accidental markdown fences
+        content = content.replace("```json", "")
+        content = content.replace("```", "")
+        content = content.strip()
+
+        params = json.loads(content)
+
+        subject = params.get("subject", "General")
+        topic = params.get("topic", "General")
+        number_of_questions = int(
+            params.get("number_of_questions", 10)
+        )
+        difficulty = params.get(
+            "difficulty",
+            "medium"
+        )
+
+        result = quiz_generator(
+            subject=subject,
+            topic=topic,
+            number_of_questions=number_of_questions,
+            difficulty=difficulty
+        )
+
+        return {
+            "success": True,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "result": f"Quiz generator error: {str(e)}"
+        }
+
+
+# ============================================================
+# Helper: Execute Study Plan Generator
+# ============================================================
+
+def execute_study_plan(question: str):
+
+    extraction_prompt = [
+        {
+            "role": "system",
+            "content": (
+                "Extract study-plan parameters from the user's request. "
+                "Return ONLY valid JSON with these keys: "
+                "subject, days, hours_per_day, topics. "
+                "days must be an integer. "
+                "hours_per_day must be a number. "
+                "If topics are not specified, use an empty string."
+            )
+        },
+        {
+            "role": "user",
+            "content": question
+        }
+    ]
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=extraction_prompt,
+            temperature=0
+        )
+
+        content = response.choices[0].message.content or "{}"
+
+        content = content.replace("```json", "")
+        content = content.replace("```", "")
+        content = content.strip()
+
+        params = json.loads(content)
+
+        subject = params.get(
+            "subject",
+            "General"
+        )
+
+        days = int(
+            params.get("days", 7)
+        )
+
+        hours_per_day = float(
+            params.get("hours_per_day", 2)
+        )
+
+        topics = params.get(
+            "topics",
+            ""
+        )
+
+        result = study_plan_generator(
+            subject=subject,
+            days=days,
+            hours_per_day=hours_per_day,
+            topics=topics
+        )
+
+        return {
+            "success": True,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "result": f"Study plan generator error: {str(e)}"
+        }
+
+
+# ============================================================
+# Main Agent
+# ============================================================
+
+def ask_agent(question: str):
+
+    question = question.strip()
+
+    if not question:
+
+        return {
+            "answer": "Please enter a question.",
+            "tool_trace": [],
+            "sources": []
+        }
+
     tool_trace = []
+    web_sources = []
 
-    # ========================================
-    # Agent Loop
-    # ========================================
+    # ========================================================
+    # STEP 1 — EDUCATION ROUTER MUST RUN FIRST
+    # ========================================================
 
-    while True:
+    router_trace = {
+        "step": 1,
+        "tool": "education_router",
+        "status": "running",
+        "arguments": json.dumps(
+            {
+                "intents": []
+            }
+        )
+    }
 
-        # ========================================
-        # Call Groq
-        # ========================================
+    tool_trace.append(router_trace)
+
+    router_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are the education task router for EduAgent AI.\n\n"
+
+                "Your ONLY job is to identify ALL applicable "
+                "education intents in the user's question.\n\n"
+
+                "Available intents:\n"
+                "- explanation\n"
+                "- numerical\n"
+                "- quiz\n"
+                "- study_plan\n"
+                "- current_information\n\n"
+
+                "IMPORTANT:\n"
+                "If multiple tasks exist, return ALL applicable intents.\n\n"
+
+                "Example:\n"
+                "25% of 2400 and latest AI developments in 2026\n"
+                "must return:\n"
+                "[\"numerical\", \"current_information\"]\n\n"
+
+                "Do not answer the user's question."
+            )
+        },
+        {
+            "role": "user",
+            "content": question
+        }
+    ]
+
+    try:
+
+        # ----------------------------------------------------
+        # FORCE router to run first
+        # ----------------------------------------------------
+
+        router_response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=router_messages,
+            tools=TOOLS,
+            tool_choice={
+                "type": "function",
+                "function": {
+                    "name": "education_router"
+                }
+            },
+            temperature=0
+        )
+
+    except Exception as e:
+
+        tool_trace[-1]["status"] = "error"
+
+        return {
+            "answer": (
+                "EduAgent AI could not run the education router. "
+                f"Error: {str(e)}"
+            ),
+            "tool_trace": tool_trace,
+            "sources": []
+        }
+
+    router_message = router_response.choices[0].message
+
+    # ========================================================
+    # STEP 2 — READ ROUTER RESULT
+    # ========================================================
+
+    intents = []
+
+    if router_message.tool_calls:
+
+        router_call = router_message.tool_calls[0]
 
         try:
 
-            response = client.chat.completions.create(
-                model="openai/gpt-oss-20b",
-                messages=messages,
-                tools=TOOLS,
-                tool_choice="auto",
+            router_arguments = json.loads(
+                router_call.function.arguments
+            )
+
+            intents = router_arguments.get(
+                "intents",
+                []
             )
 
         except Exception as e:
 
+            tool_trace[-1]["status"] = "error"
+
             return {
                 "answer": (
-                    "EduAgent AI could not contact the AI service. "
+                    "Education router returned invalid arguments. "
                     f"Error: {str(e)}"
                 ),
                 "tool_trace": tool_trace,
                 "sources": []
             }
 
-        message = response.choices[0].message
+    else:
 
-        # ========================================
-        # Agent Finished
-        # ========================================
+        tool_trace[-1]["status"] = "error"
 
-        if not message.tool_calls:
+        return {
+            "answer": (
+                "Education router did not return a valid routing result."
+            ),
+            "tool_trace": tool_trace,
+            "sources": []
+        }
 
-            final_answer = message.content or (
-                "I could not generate a final answer."
-            )
+    # Remove duplicates while preserving order
+    intents = list(dict.fromkeys(intents))
 
-            return {
-                "answer": final_answer,
-                "tool_trace": tool_trace,
-                "sources": web_sources
-            }
+    tool_trace[-1]["arguments"] = json.dumps(
+        {
+            "intents": intents
+        },
+        ensure_ascii=False
+    )
 
-        # ========================================
-        # Save Assistant Tool Calls
-        # ========================================
+    tool_trace[-1]["status"] = "success"
 
-        messages.append(
+    # ========================================================
+    # STEP 3 — DETERMINISTIC TOOL EXECUTION
+    # ========================================================
+
+    tool_results = []
+
+    # --------------------------------------------------------
+    # NUMERICAL
+    # --------------------------------------------------------
+
+    if "numerical" in intents:
+
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "calculator",
+            "status": "running",
+            "arguments": "{}"
+        }
+
+        tool_trace.append(trace)
+
+        calculation_result = execute_calculator(
+            question
+        )
+
+        trace["arguments"] = json.dumps(
             {
-                "role": "assistant",
-                "content": message.content,
-                "tool_calls": [
-                    {
-                        "id": tool_call.id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments,
-                        },
-                    }
-                    for tool_call in message.tool_calls
-                ],
+                "expression": calculation_result.get(
+                    "expression",
+                    ""
+                )
+            },
+            ensure_ascii=False
+        )
+
+        if calculation_result["success"]:
+
+            trace["status"] = "success"
+
+        else:
+
+            trace["status"] = "error"
+
+        tool_results.append(
+            {
+                "tool": "calculator",
+                "data": calculation_result
             }
         )
 
-        # ========================================
-        # Execute Requested Tools
-        # ========================================
+    # --------------------------------------------------------
+    # CURRENT INFORMATION
+    # --------------------------------------------------------
 
-        for tool_call in message.tool_calls:
+    if "current_information" in intents:
 
-            tool_name = tool_call.function.name
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "web_search",
+            "status": "running",
+            "arguments": json.dumps(
+                {
+                    "query": question
+                },
+                ensure_ascii=False
+            )
+        }
 
-            # ========================================
-            # Record Tool
-            # ========================================
+        tool_trace.append(trace)
 
-            trace_entry = {
-                "step": len(tool_trace) + 1,
-                "tool": tool_name,
-                "status": "running",
-                "arguments": tool_call.function.arguments
-            }
+        search_result = execute_web_search(
+            question
+        )
 
-            tool_trace.append(trace_entry)
+        if search_result["success"]:
 
-            # ========================================
-            # Parse Arguments
-            # ========================================
+            trace["status"] = "success"
 
             try:
 
-                arguments = json.loads(
-                    tool_call.function.arguments
+                parsed_result = json.loads(
+                    search_result["result"]
                 )
 
-            except Exception:
+                if isinstance(parsed_result, list):
 
-                result = (
-                    "Tool error: invalid JSON arguments "
-                    "provided by the AI."
-                )
+                    for source in parsed_result:
 
-                tool_trace[-1]["status"] = "error"
-
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result
-                    }
-                )
-
-                continue
-
-            # ========================================
-            # Calculator
-            # ========================================
-
-            if tool_name == "calculator":
-
-                try:
-
-                    expression = arguments["expression"]
-
-                    result = calculator(
-                        expression
-                    )
-
-                except Exception as e:
-
-                    result = (
-                        f"Calculator tool error: {str(e)}"
-                    )
-
-            # ========================================
-            # Web Search
-            # ========================================
-
-            elif tool_name == "web_search":
-
-                try:
-
-                    query = arguments["query"]
-
-                    result = web_search(
-                        query
-                    )
-
-                    # --------------------------------
-                    # Process Search Sources
-                    # --------------------------------
-
-                    try:
-
-                        parsed_result = json.loads(
-                            result
+                        source["source_id"] = (
+                            len(web_sources) + 1
                         )
 
-                        if isinstance(
-                            parsed_result,
-                            list
-                        ):
+                        web_sources.append(
+                            source
+                        )
 
-                            for source in parsed_result:
+            except Exception:
+                pass
 
-                                source["source_id"] = (
-                                    next_source_id
-                                )
+        else:
 
-                                next_source_id += 1
+            trace["status"] = "error"
 
-                            result = json.dumps(
-                                parsed_result,
-                                ensure_ascii=False
-                            )
+        tool_results.append(
+            {
+                "tool": "web_search",
+                "data": search_result
+            }
+        )
 
-                            web_sources.extend(
-                                parsed_result
-                            )
+    # --------------------------------------------------------
+    # QUIZ
+    # --------------------------------------------------------
 
-                    except Exception:
+    if "quiz" in intents:
 
-                        pass
-
-                except Exception as e:
-
-                    result = (
-                        f"Web search tool error: {str(e)}"
-                    )
-
-            # ========================================
-            # Education Router
-            # ========================================
-
-            elif tool_name == "education_router":
-
-                try:
-
-                    intents = arguments["intents"]
-
-                    result = education_router(
-                        intents
-                    )
-
-                except Exception as e:
-
-                    result = (
-                        f"Education router error: {str(e)}"
-                    )
-
-            # ========================================
-            # Quiz Generator
-            # ========================================
-
-            elif tool_name == "quiz_generator":
-
-                try:
-
-                    subject = arguments["subject"]
-
-                    topic = arguments["topic"]
-
-                    number_of_questions = arguments.get(
-                        "number_of_questions",
-                        10
-                    )
-
-                    difficulty = arguments.get(
-                        "difficulty",
-                        "medium"
-                    )
-
-                    result = quiz_generator(
-                        subject=subject,
-                        topic=topic,
-                        number_of_questions=number_of_questions,
-                        difficulty=difficulty
-                    )
-
-                except Exception as e:
-
-                    result = (
-                        f"Quiz generator tool error: {str(e)}"
-                    )
-
-            # ========================================
-            # Study Plan Generator
-            # ========================================
-
-            elif tool_name == "study_plan_generator":
-
-                try:
-
-                    subject = arguments["subject"]
-
-                    days = arguments["days"]
-
-                    hours_per_day = arguments[
-                        "hours_per_day"
-                    ]
-
-                    topics = arguments.get(
-                        "topics",
-                        ""
-                    )
-
-                    result = study_plan_generator(
-                        subject=subject,
-                        days=days,
-                        hours_per_day=hours_per_day,
-                        topics=topics
-                    )
-
-                except Exception as e:
-
-                    result = (
-                        f"Study plan generator error: {str(e)}"
-                    )
-
-            # ========================================
-            # Unknown Tool
-            # ========================================
-
-            else:
-
-                result = (
-                    f"Unknown tool requested: {tool_name}"
-                )
-
-            # ========================================
-            # Update Tool Status
-            # ========================================
-
-            if result:
-
-                if (
-                    isinstance(result, str)
-                    and (
-                        "tool error" in result.lower()
-                        or "error:" in result.lower()
-                    )
-                ):
-
-                    tool_trace[-1]["status"] = "error"
-
-                else:
-
-                    tool_trace[-1]["status"] = "success"
-
-            else:
-
-                tool_trace[-1]["status"] = "success"
-
-            # ========================================
-            # Send Tool Result Back to Groq
-            # ========================================
-
-            messages.append(
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "quiz_generator",
+            "status": "running",
+            "arguments": json.dumps(
                 {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": result
-                }
+                    "question": question
+                },
+                ensure_ascii=False
             )
+        }
+
+        tool_trace.append(trace)
+
+        quiz_result = execute_quiz(
+            question
+        )
+
+        trace["status"] = (
+            "success"
+            if quiz_result["success"]
+            else "error"
+        )
+
+        tool_results.append(
+            {
+                "tool": "quiz_generator",
+                "data": quiz_result
+            }
+        )
+
+    # --------------------------------------------------------
+    # STUDY PLAN
+    # --------------------------------------------------------
+
+    if "study_plan" in intents:
+
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "study_plan_generator",
+            "status": "running",
+            "arguments": json.dumps(
+                {
+                    "question": question
+                },
+                ensure_ascii=False
+            )
+        }
+
+        tool_trace.append(trace)
+
+        study_result = execute_study_plan(
+            question
+        )
+
+        trace["status"] = (
+            "success"
+            if study_result["success"]
+            else "error"
+        )
+
+        tool_results.append(
+            {
+                "tool": "study_plan_generator",
+                "data": study_result
+            }
+        )
+
+    # ========================================================
+    # STEP 4 — FINAL AI RESPONSE
+    # ========================================================
+
+    final_context = {
+        "user_question": question,
+        "detected_intents": intents,
+        "tool_results": tool_results
+    }
+
+    final_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are EduAgent AI, an intelligent education "
+                "assistant.\n\n"
+
+                "Answer the user's question using the tool "
+                "results provided below.\n\n"
+
+                "IMPORTANT RULES:\n"
+                "1. Use the calculator result for numerical answers.\n"
+                "2. Do not recalculate numerical results yourself "
+                "when a calculator result is available.\n"
+                "3. For current information, use only information "
+                "returned by web_search.\n"
+                "4. Do not invent sources, URLs, facts, or citations.\n"
+                "5. If a tool failed or information is insufficient, "
+                "clearly say so.\n"
+                "6. If multiple tasks exist, answer ALL of them.\n"
+                "7. Give a clear, well-structured educational answer.\n"
+                "8. Do not mention internal orchestration unless "
+                "the user asks about it."
+            )
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                final_context,
+                ensure_ascii=False,
+                indent=2
+            )
+        }
+    ]
+
+    try:
+
+        final_response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=final_messages,
+            temperature=0.2
+        )
+
+        final_answer = (
+            final_response.choices[0].message.content
+            or "I could not generate a final answer."
+        )
+
+    except Exception as e:
+
+        final_answer = (
+            "EduAgent AI completed the required tools, "
+            "but could not generate the final response. "
+            f"Error: {str(e)}"
+        )
+
+    # ========================================================
+    # STEP 5 — FINAL RESPONSE TRACE
+    # ========================================================
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "final_response",
+            "status": "success",
+            "arguments": "{}"
+        }
+    )
+
+    return {
+        "answer": final_answer,
+        "tool_trace": tool_trace,
+        "sources": web_sources
+    }
+
