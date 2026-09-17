@@ -906,10 +906,10 @@ def ask_agent(
             tools=TOOLS,
             tool_choice={
                 "type": "function",
-                "function": {
-                    "name": "education_router"
-                }
-            },
+                tool_choice="required"
+                    
+                
+            
             temperature=0
         )
 
