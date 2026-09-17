@@ -20,6 +20,19 @@ client = Groq(
 )
 
 
+# ============================================================
+# Conversation Memory
+# ============================================================
+
+conversation_memory = {}
+
+MAX_HISTORY = 6
+
+
+# ============================================================
+# Helper: Extract Calculation
+# ============================================================
+
 def extract_calculation(question: str):
     """
     Detect common mathematical expressions from
@@ -28,12 +41,7 @@ def extract_calculation(question: str):
 
     text = question.lower().strip()
 
-    # --------------------------------------------------------
     # Percentage of a number
-    # Examples:
-    # 25% of 2400
-    # 35 percent of 240 students
-    # --------------------------------------------------------
     percentage_match = re.search(
         r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s*(?:of)\s*"
         r"(\d+(?:\.\d+)?)",
@@ -41,19 +49,13 @@ def extract_calculation(question: str):
     )
 
     if percentage_match:
+
         percentage = float(percentage_match.group(1))
         number = float(percentage_match.group(2))
 
         return f"({percentage} / 100) * {number}"
 
-    # --------------------------------------------------------
-    # Percentage with total appearing BEFORE percentage
-    #
-    # Examples:
-    # 240 students and 35% are girls
-    # 500 people, 20% are children
-    # 100 students have 30% girls
-    # --------------------------------------------------------
+    # Total before percentage
     reverse_percentage_match = re.search(
         r"(\d+(?:\.\d+)?)\s*"
         r"(?:students?|people|persons?|children|items?|"
@@ -73,20 +75,13 @@ def extract_calculation(question: str):
             reverse_percentage_match.group(2)
         )
 
-        # Avoid treating a percentage followed by another
-        # number as a reverse percentage calculation.
         if percentage <= 100:
 
             return (
                 f"({percentage} / 100) * {number}"
             )
 
-    # --------------------------------------------------------
-    # Percentage with "out of"
-    #
-    # Example:
-    # 35% out of 240 students
-    # --------------------------------------------------------
+    # Percentage with out of/from/among
     out_of_match = re.search(
         r"(\d+(?:\.\d+)?)\s*(?:%|percent)"
         r".{0,30}?"
@@ -109,14 +104,7 @@ def extract_calculation(question: str):
             f"({percentage} / 100) * {number}"
         )
 
-    # --------------------------------------------------------
-    # Basic arithmetic expressions
-    #
-    # Examples:
-    # 125 * 48
-    # 500 + 250
-    # 1000 / 25
-    # --------------------------------------------------------
+    # Basic arithmetic
     arithmetic_match = re.search(
         r"(\d+(?:\.\d+)?)\s*"
         r"([\+\-\*\/])\s*"
@@ -137,23 +125,11 @@ def extract_calculation(question: str):
     return None
 
 
-
-    
-            
-
-    
-        
-
-
 # ============================================================
-# Helper: Extract web-search query
+# Helper: Extract Web Query
 # ============================================================
 
 def extract_web_query(question: str):
-    """
-    For current/latest/recent questions, the original
-    user question is a safe search query.
-    """
 
     return question.strip()
 
@@ -167,6 +143,7 @@ def execute_calculator(question: str):
     expression = extract_calculation(question)
 
     if not expression:
+
         return {
             "success": False,
             "result": (
@@ -176,6 +153,7 @@ def execute_calculator(question: str):
         }
 
     try:
+
         result = calculator(expression)
 
         return {
@@ -202,6 +180,7 @@ def execute_web_search(question: str):
     query = extract_web_query(question)
 
     try:
+
         result = web_search(query)
 
         return {
@@ -224,10 +203,6 @@ def execute_web_search(question: str):
 # ============================================================
 
 def execute_quiz(question: str):
-
-    # Ask Groq to extract quiz parameters.
-    # This is NOT the main tool orchestration.
-    # The router has already identified the quiz intent.
 
     extraction_prompt = [
         {
@@ -257,18 +232,29 @@ def execute_quiz(question: str):
 
         content = response.choices[0].message.content or "{}"
 
-        # Remove accidental markdown fences
         content = content.replace("```json", "")
         content = content.replace("```", "")
         content = content.strip()
 
         params = json.loads(content)
 
-        subject = params.get("subject", "General")
-        topic = params.get("topic", "General")
-        number_of_questions = int(
-            params.get("number_of_questions", 10)
+        subject = params.get(
+            "subject",
+            "General"
         )
+
+        topic = params.get(
+            "topic",
+            "General"
+        )
+
+        number_of_questions = int(
+            params.get(
+                "number_of_questions",
+                10
+            )
+        )
+
         difficulty = params.get(
             "difficulty",
             "medium"
@@ -295,7 +281,7 @@ def execute_quiz(question: str):
 
 
 # ============================================================
-# Helper: Execute Study Plan Generator
+# Helper: Execute Study Plan
 # ============================================================
 
 def execute_study_plan(question: str):
@@ -340,11 +326,17 @@ def execute_study_plan(question: str):
         )
 
         days = int(
-            params.get("days", 7)
+            params.get(
+                "days",
+                7
+            )
         )
 
         hours_per_day = float(
-            params.get("hours_per_day", 2)
+            params.get(
+                "hours_per_day",
+                2
+            )
         )
 
         topics = params.get(
@@ -373,12 +365,102 @@ def execute_study_plan(question: str):
 
 
 # ============================================================
+# Helper: Resolve Conversation Context
+# ============================================================
+
+def resolve_context(question: str, history: list):
+
+    if not history:
+        return question
+
+    history_text = "\n".join(
+        [
+            f"User: {item['question']}\n"
+            f"Assistant: {item['answer']}"
+            for item in history[-MAX_HISTORY:]
+        ]
+    )
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a conversation context resolver for "
+                "an education AI agent.\n\n"
+
+                "Your job is to convert the CURRENT user question "
+                "into a standalone question when it depends on "
+                "previous conversation.\n\n"
+
+                "Rules:\n"
+                "1. Use previous conversation only when necessary.\n"
+                "2. Resolve words like it, this, that, these, those, "
+                "same subject, continue, change, modify, add, remove, "
+                "make it easier, make it harder, etc.\n"
+                "3. Preserve the user's actual requested change.\n"
+                "4. If the current question is already standalone, "
+                "return it unchanged.\n"
+                "5. Return ONLY the resolved standalone question.\n"
+                "6. Do not answer the question.\n\n"
+
+                "Example:\n"
+                "Previous: User created a Biology study plan.\n"
+                "Current: Make it 2 hours per day.\n"
+                "Resolved: Change the Biology study plan to 2 hours "
+                "per day.\n"
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                "Previous conversation:\n\n"
+                f"{history_text}\n\n"
+                "Current user question:\n"
+                f"{question}"
+            )
+        }
+    ]
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=messages,
+            temperature=0
+        )
+
+        resolved = (
+            response.choices[0].message.content
+            or question
+        )
+
+        resolved = resolved.strip()
+
+        return resolved if resolved else question
+
+    except Exception:
+
+        # If context resolution fails,
+        # continue safely with the original question.
+        return question
+
+
+# ============================================================
 # Main Agent
 # ============================================================
 
-def ask_agent(question: str):
+def ask_agent(
+    question: str,
+    session_id: str = "default"
+):
 
     question = question.strip()
+
+    session_id = (
+        session_id.strip()
+        if session_id
+        else "default"
+    )
 
     if not question:
 
@@ -388,11 +470,26 @@ def ask_agent(question: str):
             "sources": []
         }
 
+    # ========================================================
+    # STEP 0 — LOAD MEMORY
+    # ========================================================
+
+    history = conversation_memory.get(
+        session_id,
+        []
+    )
+
+    # Resolve current question using previous conversation
+    contextual_question = resolve_context(
+        question,
+        history
+    )
+
     tool_trace = []
     web_sources = []
 
     # ========================================================
-    # STEP 1 — EDUCATION ROUTER MUST RUN FIRST
+    # STEP 1 — EDUCATION ROUTER
     # ========================================================
 
     router_trace = {
@@ -427,25 +524,16 @@ def ask_agent(question: str):
                 "IMPORTANT:\n"
                 "If multiple tasks exist, return ALL applicable intents.\n\n"
 
-                "Example:\n"
-                "25% of 2400 and latest AI developments in 2026\n"
-                "must return:\n"
-                "[\"numerical\", \"current_information\"]\n\n"
-
                 "Do not answer the user's question."
             )
         },
         {
             "role": "user",
-            "content": question
+            "content": contextual_question
         }
     ]
 
     try:
-
-        # ----------------------------------------------------
-        # FORCE router to run first
-        # ----------------------------------------------------
 
         router_response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -473,17 +561,17 @@ def ask_agent(question: str):
             "sources": []
         }
 
-    router_message = router_response.choices[0].message
-
-    # ========================================================
-    # STEP 2 — READ ROUTER RESULT
-    # ========================================================
+    router_message = (
+        router_response.choices[0].message
+    )
 
     intents = []
 
     if router_message.tool_calls:
 
-        router_call = router_message.tool_calls[0]
+        router_call = (
+            router_message.tool_calls[0]
+        )
 
         try:
 
@@ -515,14 +603,16 @@ def ask_agent(question: str):
 
         return {
             "answer": (
-                "Education router did not return a valid routing result."
+                "Education router did not return "
+                "a valid routing result."
             ),
             "tool_trace": tool_trace,
             "sources": []
         }
 
-    # Remove duplicates while preserving order
-    intents = list(dict.fromkeys(intents))
+    intents = list(
+        dict.fromkeys(intents)
+    )
 
     tool_trace[-1]["arguments"] = json.dumps(
         {
@@ -534,13 +624,13 @@ def ask_agent(question: str):
     tool_trace[-1]["status"] = "success"
 
     # ========================================================
-    # STEP 3 — DETERMINISTIC TOOL EXECUTION
+    # STEP 2 — DETERMINISTIC TOOL EXECUTION
     # ========================================================
 
     tool_results = []
 
     # --------------------------------------------------------
-    # NUMERICAL
+    # Calculator
     # --------------------------------------------------------
 
     if "numerical" in intents:
@@ -555,7 +645,7 @@ def ask_agent(question: str):
         tool_trace.append(trace)
 
         calculation_result = execute_calculator(
-            question
+            contextual_question
         )
 
         trace["arguments"] = json.dumps(
@@ -568,13 +658,11 @@ def ask_agent(question: str):
             ensure_ascii=False
         )
 
-        if calculation_result["success"]:
-
-            trace["status"] = "success"
-
-        else:
-
-            trace["status"] = "error"
+        trace["status"] = (
+            "success"
+            if calculation_result["success"]
+            else "error"
+        )
 
         tool_results.append(
             {
@@ -584,7 +672,7 @@ def ask_agent(question: str):
         )
 
     # --------------------------------------------------------
-    # CURRENT INFORMATION
+    # Web Search
     # --------------------------------------------------------
 
     if "current_information" in intents:
@@ -595,7 +683,7 @@ def ask_agent(question: str):
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "query": question
+                    "query": contextual_question
                 },
                 ensure_ascii=False
             )
@@ -604,7 +692,7 @@ def ask_agent(question: str):
         tool_trace.append(trace)
 
         search_result = execute_web_search(
-            question
+            contextual_question
         )
 
         if search_result["success"]:
@@ -617,7 +705,10 @@ def ask_agent(question: str):
                     search_result["result"]
                 )
 
-                if isinstance(parsed_result, list):
+                if isinstance(
+                    parsed_result,
+                    list
+                ):
 
                     for source in parsed_result:
 
@@ -630,6 +721,7 @@ def ask_agent(question: str):
                         )
 
             except Exception:
+
                 pass
 
         else:
@@ -644,7 +736,7 @@ def ask_agent(question: str):
         )
 
     # --------------------------------------------------------
-    # QUIZ
+    # Quiz Generator
     # --------------------------------------------------------
 
     if "quiz" in intents:
@@ -655,7 +747,7 @@ def ask_agent(question: str):
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "question": question
+                    "question": contextual_question
                 },
                 ensure_ascii=False
             )
@@ -664,7 +756,7 @@ def ask_agent(question: str):
         tool_trace.append(trace)
 
         quiz_result = execute_quiz(
-            question
+            contextual_question
         )
 
         trace["status"] = (
@@ -681,7 +773,7 @@ def ask_agent(question: str):
         )
 
     # --------------------------------------------------------
-    # STUDY PLAN
+    # Study Plan Generator
     # --------------------------------------------------------
 
     if "study_plan" in intents:
@@ -692,7 +784,7 @@ def ask_agent(question: str):
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "question": question
+                    "question": contextual_question
                 },
                 ensure_ascii=False
             )
@@ -701,7 +793,7 @@ def ask_agent(question: str):
         tool_trace.append(trace)
 
         study_result = execute_study_plan(
-            question
+            contextual_question
         )
 
         trace["status"] = (
@@ -718,11 +810,12 @@ def ask_agent(question: str):
         )
 
     # ========================================================
-    # STEP 4 — FINAL AI RESPONSE
+    # STEP 3 — FINAL AI RESPONSE
     # ========================================================
 
     final_context = {
         "user_question": question,
+        "resolved_question": contextual_question,
         "detected_intents": intents,
         "tool_results": tool_results
     }
@@ -784,7 +877,28 @@ def ask_agent(question: str):
         )
 
     # ========================================================
-    # STEP 5 — FINAL RESPONSE TRACE
+    # STEP 4 — SAVE CONVERSATION MEMORY
+    # ========================================================
+
+    conversation_memory.setdefault(
+        session_id,
+        []
+    )
+
+    conversation_memory[session_id].append(
+        {
+            "question": question,
+            "answer": final_answer
+        }
+    )
+
+    # Keep only recent conversations
+    conversation_memory[session_id] = (
+        conversation_memory[session_id][-MAX_HISTORY:]
+    )
+
+    # ========================================================
+    # FINAL TRACE
     # ========================================================
 
     tool_trace.append(
