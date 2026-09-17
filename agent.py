@@ -28,27 +28,46 @@ def ask_agent(question: str):
                 "You are EduAgent AI, an intelligent education assistant. "
                 "Answer questions clearly and accurately.\n\n"
 
-                "TOOL RULES:\n"
-                "1. For every education-related question, education_router "
-                "must be called first.\n"
-                "2. Do not call calculator, web_search, quiz_generator, "
-                "or study_plan_generator before education_router.\n"
-                "3. For numerical questions, use calculator after routing. "
-                "Always convert the calculation into a valid mathematical expression "
-                "before calling calculator. Do not send natural-language expressions "
-                "such as '25% of 2400'. For example, convert 25% of 2400 into "
+                "IMPORTANT TOOL RULES:\n"
+
+                "1. For every education-related question, call "
+                "education_router FIRST.\n"
+
+                "2. After education_router, identify ALL tasks contained "
+                "in the user's question.\n"
+
+                "3. If the question contains multiple tasks, use ALL "
+                "required tools before generating the final answer.\n"
+
+                "4. Numerical calculations MUST use calculator.\n"
+                "Always convert natural-language percentages or calculations "
+                "into a valid mathematical expression before calling "
+                "calculator. Example: convert '25% of 2400' into "
                 "'0.25 * 2400'.\n"
-                "4. For quiz requests, use quiz_generator after routing.\n"
-                "5. For study-plan requests, use study_plan_generator after routing.\n"
-                "6. For current-information requests, use web_search after routing.\n"
-                "7. For explanation requests, answer after routing without "
-                "another tool unless one is genuinely required.\n"
-                "8. You may use more than one tool when necessary.\n"
-                "9. Use the result of one tool together with another tool "
-                "when required.\n"
-                "10. Base web-search answers only on retrieved results.\n"
-                "11. Do not invent facts, sources, URLs, or citations.\n"
-                "12. If available information is insufficient, say so "
+
+                "5. Current, latest, recent, today's, or 2026 information "
+                "MUST use web_search.\n"
+
+                "6. Quiz requests MUST use quiz_generator.\n"
+
+                "7. Study-plan requests MUST use study_plan_generator.\n"
+
+                "8. Explanation-only questions may be answered after "
+                "education_router without another tool when no tool is "
+                "genuinely required.\n"
+
+                "9. For multi-task questions, do NOT stop after using only "
+                "one tool if another tool is required for another part "
+                "of the question.\n"
+
+                "10. Use the results of all required tools when creating "
+                "the final answer.\n"
+
+                "11. For web-search answers, use only information returned "
+                "by web_search. Do not invent facts, sources, URLs, or "
+                "citations.\n"
+
+                "12. If information is insufficient, clearly say so "
                 "instead of guessing.\n"
             ),
         },
@@ -60,17 +79,18 @@ def ask_agent(question: str):
 
     web_sources = []
     next_source_id = 1
-
     tool_trace = []
 
     # ========================================
     # Agent Loop
     # ========================================
+
     while True:
 
         # ========================================
         # Groq API
         # ========================================
+
         try:
 
             response = client.chat.completions.create(
@@ -96,6 +116,7 @@ def ask_agent(question: str):
         # ========================================
         # Agent Finished
         # ========================================
+
         if not message.tool_calls:
 
             final_answer = message.content or (
@@ -111,6 +132,7 @@ def ask_agent(question: str):
         # ========================================
         # Add Assistant Tool Calls
         # ========================================
+
         messages.append(
             {
                 "role": "assistant",
@@ -132,6 +154,7 @@ def ask_agent(question: str):
         # ========================================
         # Execute Tools
         # ========================================
+
         for tool_call in message.tool_calls:
 
             tool_name = tool_call.function.name
@@ -139,6 +162,7 @@ def ask_agent(question: str):
             # ========================================
             # Record Tool Execution
             # ========================================
+
             trace_entry = {
                 "step": len(tool_trace) + 1,
                 "tool": tool_name,
@@ -151,6 +175,7 @@ def ask_agent(question: str):
             # ========================================
             # Parse Arguments
             # ========================================
+
             try:
 
                 arguments = json.loads(
@@ -179,6 +204,7 @@ def ask_agent(question: str):
             # ========================================
             # Calculator
             # ========================================
+
             if tool_name == "calculator":
 
                 try:
@@ -198,6 +224,7 @@ def ask_agent(question: str):
             # ========================================
             # Web Search
             # ========================================
+
             elif tool_name == "web_search":
 
                 try:
@@ -249,6 +276,7 @@ def ask_agent(question: str):
             # ========================================
             # Education Router
             # ========================================
+
             elif tool_name == "education_router":
 
                 try:
@@ -268,11 +296,13 @@ def ask_agent(question: str):
             # ========================================
             # Quiz Generator
             # ========================================
+
             elif tool_name == "quiz_generator":
 
                 try:
 
                     subject = arguments["subject"]
+
                     topic = arguments["topic"]
 
                     number_of_questions = arguments.get(
@@ -301,13 +331,18 @@ def ask_agent(question: str):
             # ========================================
             # Study Plan Generator
             # ========================================
+
             elif tool_name == "study_plan_generator":
 
                 try:
 
                     subject = arguments["subject"]
+
                     days = arguments["days"]
-                    hours_per_day = arguments["hours_per_day"]
+
+                    hours_per_day = arguments[
+                        "hours_per_day"
+                    ]
 
                     topics = arguments.get(
                         "topics",
@@ -330,6 +365,7 @@ def ask_agent(question: str):
             # ========================================
             # Unknown Tool
             # ========================================
+
             else:
 
                 result = (
@@ -339,6 +375,7 @@ def ask_agent(question: str):
             # ========================================
             # Update Tool Status
             # ========================================
+
             if result:
 
                 if (
@@ -348,8 +385,11 @@ def ask_agent(question: str):
                         or "error:" in result.lower()
                     )
                 ):
+
                     tool_trace[-1]["status"] = "error"
+
                 else:
+
                     tool_trace[-1]["status"] = "success"
 
             else:
@@ -359,6 +399,7 @@ def ask_agent(question: str):
             # ========================================
             # Send Tool Result Back to LLM
             # ========================================
+
             messages.append(
                 {
                     "role": "tool",
