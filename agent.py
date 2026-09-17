@@ -608,190 +608,70 @@ def resolve_context(
 
 def execute_quiz_result(question: str):
 
-    extraction_prompt = [
-        {
-            "role": "system",
-            "content": (
-                "Extract ONLY explicit quiz result information "
-                "from the user's request.\n\n"
-
-                "Return ONLY valid JSON with these keys:\n"
-                "subject, topic, score, score_type, "
-                "total_questions, correct_answers\n\n"
-
-                "Rules:\n"
-                "1. Do not invent or guess any value.\n"
-                "2. score must be a number.\n"
-                "3. score_type must be percentage when the user "
-                "provides a percentage score.\n"
-                "4. subject and topic may be empty strings if not stated.\n"
-                "5. total_questions and correct_answers should be 0 "
-                "when not explicitly stated.\n"
-            )
-        },
-        {
-            "role": "user",
-            "content": question
-        }
-    ]
-
     try:
 
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=extraction_prompt,
-            temperature=0
-        )
-
-        content = (
-            response.choices[0].message.content
-            or "{}"
-        )
-
-        content = content.replace(
-            "```json",
-            ""
-        )
-
-        content = content.replace(
-            "```",
-            ""
-        )
-
-        content = content.strip()
-
-        print("\n================ QUIZ RESULT RAW MODEL OUTPUT ================\n")
-        print(content)
-        print("\n===============================================================\n")
- 
         # ----------------------------------------------------
-        # Extract JSON object
+        # Extract percentage score
+        # Example:
+        # "I scored 80% in my photosynthesis quiz."
         # ----------------------------------------------------
 
-        json_match = re.search(
-            r"\{.*\}",
-            content,
-            re.DOTALL
+        score_match = re.search(
+            r"(\d+(?:\.\d+)?)\s*%",
+            question
         )
 
-        if not json_match:
+        if not score_match:
 
             return {
                 "success": False,
                 "result": (
                     "Quiz result analyzer error: "
-                    "No valid JSON object found in model response."
+                    "No percentage score found."
                 )
             }
 
-        json_text = json_match.group(0)
-
-        # ----------------------------------------------------
-        # Parse JSON safely
-        # ----------------------------------------------------
-
-        try:
-
-            params = json.loads(
-                json_text
-            )
-
-        except json.JSONDecodeError as e:
-
-            return {
-                "success": False,
-                "result": (
-                    "Quiz result analyzer JSON parsing error: "
-                    f"{str(e)}"
-                )
-            }
-
-        # ----------------------------------------------------
-        # Extract values
-        # ----------------------------------------------------
-
-        subject = params.get(
-            "subject",
-            ""
+        score = float(
+            score_match.group(1)
         )
 
-        topic = params.get(
-            "topic",
-            ""
+        # ----------------------------------------------------
+        # Extract topic
+        # ----------------------------------------------------
+
+        topic = ""
+
+        topic_match = re.search(
+            r"(?:in|on)\s+(?:my\s+)?(.+?)\s+quiz",
+            question,
+            re.IGNORECASE
         )
 
-        raw_score = params.get(
-            "score"
-        )
+        if topic_match:
 
-        if raw_score is None:
-
-            return {
-                "success": False,
-                "result": (
-                    "Quiz result analyzer error: "
-                    "No score was found in the extracted result."
-                )
-            }
-
-        try:
-
-            score = float(
-                raw_score
-            )
-
-        except (TypeError, ValueError):
-
-            return {
-                "success": False,
-                "result": (
-                    "Quiz result analyzer error: "
-                    "Score is not a valid number."
-                )
-            }
-
-        score_type = params.get(
-            "score_type",
-            "percentage"
-        )
-
-        try:
-
-            total_questions = int(
-                params.get(
-                    "total_questions",
-                    0
-                )
-            )
-
-        except (TypeError, ValueError):
-
-            total_questions = 0
-
-        try:
-
-            correct_answers = int(
-                params.get(
-                    "correct_answers",
-                    0
-                )
-            )
-
-        except (TypeError, ValueError):
-
-            correct_answers = 0
+            topic = topic_match.group(1).strip()
 
         # ----------------------------------------------------
-        # Run Quiz Result Analyzer
+        # Clean topic
+        # ----------------------------------------------------
+
+        topic = re.sub(
+            r"\s+",
+            " ",
+            topic
+        )
+
+        # ----------------------------------------------------
+        # Run existing analyzer
         # ----------------------------------------------------
 
         result = quiz_result_analyzer(
-            subject=subject,
+            subject="",
             topic=topic,
             score=score,
-            score_type=score_type,
-            total_questions=total_questions,
-            correct_answers=correct_answers
+            score_type="percentage",
+            total_questions=0,
+            correct_answers=0
         )
 
         return {
@@ -807,6 +687,18 @@ def execute_quiz_result(question: str):
                 f"Quiz result analyzer error: {str(e)}"
             )
         }
+
+
+
+    
+
+        
+            
+
+            
+                
+                    
+            
 
 
 
