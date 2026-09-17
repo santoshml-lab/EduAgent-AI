@@ -661,6 +661,8 @@ def ask_agent(
         session_id,
         []
     )
+    print("DEBUG LEARNING PROGRESS:", progress)
+    print("DEBUG SESSION ID:", session_id)
 
     # ========================================================
     # STEP 0.6 — RESOLVE CONTEXT
