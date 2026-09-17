@@ -660,6 +660,10 @@ def execute_quiz_result(question: str):
 
         content = content.strip()
 
+        print("\n================ QUIZ RESULT RAW MODEL OUTPUT ================\n")
+        print(content)
+        print("\n===============================================================\n")
+ 
         # ----------------------------------------------------
         # Extract JSON object
         # ----------------------------------------------------
