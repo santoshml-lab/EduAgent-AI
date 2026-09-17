@@ -11,7 +11,7 @@ from tools import (
     quiz_generator,
     study_plan_generator,
     weak_topic_detector,
-    
+    quiz_result_analyzer,
     TOOLS
 )
 
@@ -608,6 +608,115 @@ def resolve_context(
 
 
 # ============================================================
+# Helper: Execute Quiz Result Analyzer
+# ============================================================
+
+def execute_quiz_result(question: str):
+
+    extraction_prompt = [
+        {
+            "role": "system",
+            "content": (
+                "Extract ONLY explicit quiz result information "
+                "from the user's request.\n\n"
+
+                "Return ONLY valid JSON with these keys:\n"
+                "subject, topic, score, score_type, "
+                "total_questions, correct_answers\n\n"
+
+                "Rules:\n"
+                "1. Do not invent or guess any value.\n"
+                "2. score must be a number.\n"
+                "3. score_type must be percentage when the user "
+                "provides a percentage score.\n"
+                "4. subject and topic may be empty strings if not stated.\n"
+                "5. total_questions and correct_answers should be 0 "
+                "when not explicitly stated.\n"
+            )
+        },
+        {
+            "role": "user",
+            "content": question
+        }
+    ]
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=extraction_prompt,
+            temperature=0
+        )
+
+        content = response.choices[0].message.content or "{}"
+
+        content = content.replace("```json", "")
+        content = content.replace("```", "")
+        content = content.strip()
+
+        params = json.loads(content)
+
+        subject = params.get(
+            "subject",
+            ""
+        )
+
+        topic = params.get(
+            "topic",
+            ""
+        )
+
+        score = float(
+            params.get(
+                "score",
+                0
+            )
+        )
+
+        score_type = params.get(
+            "score_type",
+            "percentage"
+        )
+
+        total_questions = int(
+            params.get(
+                "total_questions",
+                0
+            )
+        )
+
+        correct_answers = int(
+            params.get(
+                "correct_answers",
+                0
+            )
+        )
+
+        result = quiz_result_analyzer(
+            subject=subject,
+            topic=topic,
+            score=score,
+            score_type=score_type,
+            total_questions=total_questions,
+            correct_answers=correct_answers
+        )
+
+        return {
+            "success": True,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "result": (
+                f"Quiz result analyzer error: {str(e)}"
+            )
+        }
+
+
+# ============================================================
 # Main Agent
 # ============================================================
 
@@ -719,13 +828,18 @@ def ask_agent(
                 "- quiz\n"
                 "- study_plan\n"
                 "- current_information\n"
-                "- weak_topic\n\n"
+                "- weak_topic\n"
+                "- quiz_result\n\n"
 
                 "IMPORTANT:\n"
                 "Use weak_topic when the user asks about weak areas, "
                 "what topic needs revision, what should be revised next, "
                 "or which learning topics need more revision based on "
                 "stored performance.\n\n"
+
+                "Use quiz_result when the user explicitly provides "
+                "a quiz/test score and asks to analyze or classify "
+                "their performance.\n\n"
 
                 "Use study_plan when the user explicitly asks for a "
                 "study schedule or study plan.\n\n"
@@ -1076,6 +1190,43 @@ def ask_agent(
                 }
             )
 
+    # --------------------------------------------------------
+    # Quiz Result Analyzer
+    # --------------------------------------------------------
+
+    if "quiz_result" in intents:
+
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "quiz_result_analyzer",
+            "status": "running",
+            "arguments": json.dumps(
+                {
+                    "question": contextual_question
+                },
+                ensure_ascii=False
+            )
+        }
+
+        tool_trace.append(trace)
+
+        quiz_result_analysis = execute_quiz_result(
+            contextual_question
+        )
+
+        trace["status"] = (
+            "success"
+            if quiz_result_analysis["success"]
+            else "error"
+        )
+
+        tool_results.append(
+            {
+                "tool": "quiz_result_analyzer",
+                "data": quiz_result_analysis
+            }
+        )
+
     # ========================================================
     # STEP 3 — FINAL AI RESPONSE
     # ========================================================
@@ -1117,8 +1268,11 @@ def ask_agent(
                 "10. If no weak topics are returned, do not invent any. "
                 "Say that no recorded topic currently meets the "
                 "weak-topic threshold.\n"
-                "11. Give a clear, well-structured educational answer.\n"
-                "12. Do not mention internal orchestration unless "
+                "11. When quiz_result_analyzer returns a performance "
+                "classification, clearly explain the classification "
+                "and its recommendation.\n"
+                "12. Give a clear, well-structured educational answer.\n"
+                "13. Do not mention internal orchestration unless "
                 "the user asks about it."
             )
         },
@@ -1191,6 +1345,7 @@ def ask_agent(
         "tool_trace": tool_trace,
         "sources": web_sources
     }
+                
 
 
 
