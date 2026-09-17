@@ -379,7 +379,10 @@ TOOLS = [
                                 "quiz",
                                 "study_plan",
                                 "current_information",
-                                "weak_topic"
+                                "weak_topic",
+                                "quiz_result"
+                            
+                                
                             ]
                         },
                         "description": (
