@@ -14,10 +14,19 @@ from tools import (
 
 load_dotenv()
 
+
+# ========================================
+# Groq Client
+# ========================================
+
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
+
+# ========================================
+# Main Agent
+# ========================================
 
 def ask_agent(question: str):
 
@@ -26,49 +35,57 @@ def ask_agent(question: str):
             "role": "system",
             "content": (
                 "You are EduAgent AI, an intelligent education assistant. "
-                "Answer questions clearly and accurately.\n\n"
+                "Answer questions clearly, accurately, and using the "
+                "appropriate tools.\n\n"
 
                 "IMPORTANT TOOL RULES:\n"
 
-                "1. For every education-related question, call "
-                "education_router FIRST.\n"
+                "1. For every education-related question, "
+                "education_router MUST be called FIRST.\n"
 
-                "2. After education_router, identify ALL tasks contained "
-                "in the user's question.\n"
+                "2. education_router supports MULTIPLE intents. "
+                "For a multi-task question, return ALL applicable "
+                "intents in the intents array.\n"
 
-                "3. If the question contains multiple tasks, use ALL "
-                "required tools before generating the final answer.\n"
+                "3. For example, if the user asks "
+                "'What is 25% of 2400 and what are the latest AI "
+                "developments in 2026?', the router should identify "
+                "BOTH numerical and current_information.\n"
 
-                "4. Numerical calculations MUST use calculator.\n"
-                "Always convert natural-language percentages or calculations "
-                "into a valid mathematical expression before calling "
-                "calculator. Example: convert '25% of 2400' into "
+                "4. After education_router, ALL required tools for "
+                "the identified intents must be executed before "
+                "generating the final answer.\n"
+
+                "5. Numerical calculations MUST use calculator.\n"
+                "Convert natural-language calculations into valid "
+                "mathematical expressions before calling calculator. "
+                "For example, convert '25% of 2400' into "
                 "'0.25 * 2400'.\n"
 
-                "5. Current, latest, recent, today's, or 2026 information "
-                "MUST use web_search.\n"
+                "6. Current, latest, recent, today's, or 2026 "
+                "information MUST use web_search.\n"
 
-                "6. Quiz requests MUST use quiz_generator.\n"
+                "7. Quiz requests MUST use quiz_generator.\n"
 
-                "7. Study-plan requests MUST use study_plan_generator.\n"
+                "8. Study-plan requests MUST use "
+                "study_plan_generator.\n"
 
-                "8. Explanation-only questions may be answered after "
-                "education_router without another tool when no tool is "
-                "genuinely required.\n"
+                "9. Explanation-only questions may be answered "
+                "after education_router without another tool when "
+                "no tool is genuinely required.\n"
 
-                "9. For multi-task questions, do NOT stop after using only "
-                "one tool if another tool is required for another part "
-                "of the question.\n"
+                "10. NEVER stop after using only one tool when "
+                "another required task remains incomplete.\n"
 
-                "10. Use the results of all required tools when creating "
-                "the final answer.\n"
+                "11. Use the results of ALL executed tools when "
+                "creating the final answer.\n"
 
-                "11. For web-search answers, use only information returned "
-                "by web_search. Do not invent facts, sources, URLs, or "
-                "citations.\n"
+                "12. For web-search answers, use only information "
+                "returned by web_search. Do not invent facts, "
+                "sources, URLs, or citations.\n"
 
-                "12. If information is insufficient, clearly say so "
-                "instead of guessing.\n"
+                "13. If available information is insufficient, "
+                "clearly say so instead of guessing.\n"
             ),
         },
         {
@@ -88,7 +105,7 @@ def ask_agent(question: str):
     while True:
 
         # ========================================
-        # Groq API
+        # Call Groq
         # ========================================
 
         try:
@@ -130,7 +147,7 @@ def ask_agent(question: str):
             }
 
         # ========================================
-        # Add Assistant Tool Calls
+        # Save Assistant Tool Calls
         # ========================================
 
         messages.append(
@@ -152,7 +169,7 @@ def ask_agent(question: str):
         )
 
         # ========================================
-        # Execute Tools
+        # Execute Requested Tools
         # ========================================
 
         for tool_call in message.tool_calls:
@@ -160,7 +177,7 @@ def ask_agent(question: str):
             tool_name = tool_call.function.name
 
             # ========================================
-            # Record Tool Execution
+            # Record Tool
             # ========================================
 
             trace_entry = {
@@ -195,7 +212,7 @@ def ask_agent(question: str):
                     {
                         "role": "tool",
                         "tool_call_id": tool_call.id,
-                        "content": result,
+                        "content": result
                     }
                 )
 
@@ -234,6 +251,10 @@ def ask_agent(question: str):
                     result = web_search(
                         query
                     )
+
+                    # --------------------------------
+                    # Process Search Sources
+                    # --------------------------------
 
                     try:
 
@@ -281,10 +302,10 @@ def ask_agent(question: str):
 
                 try:
 
-                    intent = arguments["intent"]
+                    intents = arguments["intents"]
 
                     result = education_router(
-                        intent
+                        intents
                     )
 
                 except Exception as e:
@@ -397,13 +418,13 @@ def ask_agent(question: str):
                 tool_trace[-1]["status"] = "success"
 
             # ========================================
-            # Send Tool Result Back to LLM
+            # Send Tool Result Back to Groq
             # ========================================
 
             messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": result,
+                    "content": result
                 }
             )
