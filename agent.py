@@ -800,7 +800,7 @@ def ask_agent(
     # STEP 1 — EDUCATION ROUTER
     # ========================================================
 
-        router_messages = [
+    router_messages = [
         {
             "role": "system",
             "content": (
