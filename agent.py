@@ -654,7 +654,27 @@ def execute_quiz_result(question: str):
         content = content.replace("```", "")
         content = content.strip()
 
-        params = json.loads(content)
+        # Extract the first JSON object from the model response
+        json_match = re.search(
+        r"\{.*\}",
+        content,
+        re.DOTALL
+)
+
+       if not json_match:
+
+         return {
+        "success": False,
+        "result": (
+            "Quiz result analyzer error: "
+            "No valid JSON object found in model response."
+        )
+    }
+
+        json_text = json_match.group(0)
+
+        params = json.loads(json_text)
+        
 
         subject = params.get(
             "subject",
