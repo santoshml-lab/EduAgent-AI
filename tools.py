@@ -1,6 +1,6 @@
 import os
 import json
-from serpapi import GoogleSearch
+import serpapi
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,7 +23,6 @@ def calculator(expression: str):
     except Exception as e:
         return f"Calculator error: {str(e)}"
 
-
 # ========================================
 # Web Search Tool
 # ========================================
@@ -32,15 +31,14 @@ def web_search(query: str):
 
     try:
 
-        params = {
+        client = serpapi.Client(
+            api_key=os.getenv("SERPAPI_KEY")
+        )
+
+        results = client.search({
             "engine": "google",
-            "q": query,
-            "api_key": os.getenv("SERPAPI_KEY")
-        }
-
-        search = GoogleSearch(params)
-
-        results = search.get_dict()
+            "q": query
+        })
 
         organic_results = results.get(
             "organic_results",
@@ -85,6 +83,10 @@ def web_search(query: str):
             },
             ensure_ascii=False
         )
+
+
+
+                    
 
 
 # ========================================
