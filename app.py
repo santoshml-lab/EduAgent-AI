@@ -4,19 +4,7 @@ from pydantic import BaseModel
 
 from agent import ask_agent
 
-
-# ========================================
-# FastAPI Application
-# ========================================
-
-app = FastAPI(
-    title="EduAgent AI"
-)
-
-
-# ========================================
-# CORS Configuration
-# ========================================
+app = FastAPI(title="EduAgent AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,29 +15,16 @@ app.add_middleware(
 )
 
 
-# ========================================
-# Request Model
-# ========================================
-
 class Question(BaseModel):
     question: str
 
 
-# ========================================
-# Health Check
-# ========================================
-
 @app.get("/")
 def home():
-
     return {
         "message": "EduAgent AI is running 🚀"
     }
 
-
-# ========================================
-# Ask EduAgent
-# ========================================
 
 @app.post("/ask")
 def ask_question(data: Question):
