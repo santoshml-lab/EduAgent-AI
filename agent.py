@@ -606,10 +606,6 @@ def resolve_context(
 
         return question
 
-# ============================================================
-# Helper: Execute Quiz Result Analyzer
-# ============================================================
-
 def execute_quiz_result(question: str):
 
     extraction_prompt = [
@@ -665,7 +661,7 @@ def execute_quiz_result(question: str):
         content = content.strip()
 
         # ----------------------------------------------------
-        # Extract JSON object from model response
+        # Extract JSON object
         # ----------------------------------------------------
 
         json_match = re.search(
@@ -687,7 +683,7 @@ def execute_quiz_result(question: str):
         json_text = json_match.group(0)
 
         # ----------------------------------------------------
-        # Parse JSON
+        # Parse JSON safely
         # ----------------------------------------------------
 
         try:
@@ -707,7 +703,7 @@ def execute_quiz_result(question: str):
             }
 
         # ----------------------------------------------------
-        # Extract parameters safely
+        # Extract values
         # ----------------------------------------------------
 
         subject = params.get(
@@ -807,6 +803,18 @@ def execute_quiz_result(question: str):
                 f"Quiz result analyzer error: {str(e)}"
             )
         }
+
+
+
+
+
+
+
+    
+
+        
+
+        
 
 
 
