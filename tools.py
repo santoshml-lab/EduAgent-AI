@@ -251,6 +251,53 @@ def weak_topic_detector(progress):
         ensure_ascii=False
     )
 
+# ========================================
+# Quiz Result Analyzer
+# ========================================
+
+def quiz_result_analyzer(
+    subject: str,
+    topic: str,
+    score: float,
+    score_type: str = "percentage",
+    total_questions: int = 0,
+    correct_answers: int = 0
+):
+
+    result = {
+        "subject": subject,
+        "topic": topic,
+        "score": score,
+        "score_type": score_type,
+        "total_questions": total_questions,
+        "correct_answers": correct_answers
+    }
+
+    if score_type == "percentage":
+
+        if score < 70:
+            result["performance"] = "weak"
+            result["recommendation"] = (
+                "Revise this topic before moving to new topics."
+            )
+
+        elif score < 85:
+            result["performance"] = "developing"
+            result["recommendation"] = (
+                "Practice more questions to strengthen understanding."
+            )
+
+        else:
+            result["performance"] = "strong"
+            result["recommendation"] = (
+                "Topic performance is strong. Continue with periodic revision."
+            )
+
+    return json.dumps(
+        result,
+        ensure_ascii=False
+    )
+
 
 # ========================================
 # Tool Definitions
@@ -470,7 +517,58 @@ TOOLS = [
                 ]
             }
         }
-    }
+    },
+
+
+        {
+        "type": "function",
+        "function": {
+            "name": "quiz_result_analyzer",
+            "description": (
+                "Analyze a quiz result and classify "
+                "learning performance."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string"
+                    },
+                    "topic": {
+                        "type": "string"
+                    },
+                    "score": {
+                        "type": "number"
+                    },
+                    "score_type": {
+                        "type": "string",
+                        "enum": [
+                            "percentage"
+                        ]
+                    },
+                    "total_questions": {
+                        "type": "integer"
+                    },
+                    "correct_answers": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "subject",
+                    "topic",
+                    "score"
+                ]
+            }
+        }
+        }
+
+
+
+
+    
+
+
+    
 
 ]
 
