@@ -30,18 +30,22 @@ MAX_HISTORY = 6
 
 
 # ============================================================
+# Learning Progress Memory
+# ============================================================
+
+learning_progress = {}
+
+MAX_PROGRESS_ITEMS = 20
+
+
+# ============================================================
 # Helper: Extract Calculation
 # ============================================================
 
 def extract_calculation(question: str):
-    """
-    Detect common mathematical expressions from
-    natural-language questions.
-    """
 
     text = question.lower().strip()
 
-    # Percentage of a number
     percentage_match = re.search(
         r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s*(?:of)\s*"
         r"(\d+(?:\.\d+)?)",
@@ -55,7 +59,6 @@ def extract_calculation(question: str):
 
         return f"({percentage} / 100) * {number}"
 
-    # Total before percentage
     reverse_percentage_match = re.search(
         r"(\d+(?:\.\d+)?)\s*"
         r"(?:students?|people|persons?|children|items?|"
@@ -81,7 +84,6 @@ def extract_calculation(question: str):
                 f"({percentage} / 100) * {number}"
             )
 
-    # Percentage with out of/from/among
     out_of_match = re.search(
         r"(\d+(?:\.\d+)?)\s*(?:%|percent)"
         r".{0,30}?"
@@ -104,7 +106,6 @@ def extract_calculation(question: str):
             f"({percentage} / 100) * {number}"
         )
 
-    # Basic arithmetic
     arithmetic_match = re.search(
         r"(\d+(?:\.\d+)?)\s*"
         r"([\+\-\*\/])\s*"
@@ -365,12 +366,148 @@ def execute_study_plan(question: str):
 
 
 # ============================================================
+# Helper: Extract Learning Progress
+# ============================================================
+
+def extract_learning_progress(question: str):
+
+    extraction_prompt = [
+        {
+            "role": "system",
+            "content": (
+                "You extract ONLY explicit learning-performance "
+                "information from a user's education-related message.\n\n"
+
+                "Return ONLY valid JSON with these keys:\n"
+                "subject, topic, score, score_type, note\n\n"
+
+                "Rules:\n"
+                "1. Only record information explicitly stated by the user.\n"
+                "2. Do not guess or infer a score.\n"
+                "3. score must be a number or null.\n"
+                "4. score_type can be percentage, marks, or null.\n"
+                "5. subject and topic can be empty strings if not stated.\n"
+                "6. note should contain a short explicit performance note.\n"
+                "7. If there is no learning-performance information, "
+                "return score as null and note as an empty string.\n\n"
+
+                "Example:\n"
+                "User: I scored 60% in my photosynthesis quiz.\n"
+                "JSON: {\n"
+                "  \"subject\": \"Biology\",\n"
+                "  \"topic\": \"photosynthesis\",\n"
+                "  \"score\": 60,\n"
+                "  \"score_type\": \"percentage\",\n"
+                "  \"note\": \"Scored 60% in a photosynthesis quiz.\"\n"
+                "}"
+            )
+        },
+        {
+            "role": "user",
+            "content": question
+        }
+    ]
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=extraction_prompt,
+            temperature=0
+        )
+
+        content = response.choices[0].message.content or "{}"
+
+        content = content.replace("```json", "")
+        content = content.replace("```", "")
+        content = content.strip()
+
+        data = json.loads(content)
+
+        score = data.get("score")
+
+        if score is not None:
+
+            try:
+                score = float(score)
+            except Exception:
+                score = None
+
+        return {
+            "subject": data.get("subject", ""),
+            "topic": data.get("topic", ""),
+            "score": score,
+            "score_type": data.get("score_type"),
+            "note": data.get("note", "")
+        }
+
+    except Exception:
+
+        return {
+            "subject": "",
+            "topic": "",
+            "score": None,
+            "score_type": None,
+            "note": ""
+        }
+
+
+# ============================================================
+# Helper: Save Learning Progress
+# ============================================================
+
+def save_learning_progress(
+    session_id: str,
+    progress: dict
+):
+
+    if progress.get("score") is None:
+        return
+
+    learning_progress.setdefault(
+        session_id,
+        []
+    )
+
+    learning_progress[session_id].append(
+        {
+            "subject": progress.get(
+                "subject",
+                ""
+            ),
+            "topic": progress.get(
+                "topic",
+                ""
+            ),
+            "score": progress.get(
+                "score"
+            ),
+            "score_type": progress.get(
+                "score_type"
+            ),
+            "note": progress.get(
+                "note",
+                ""
+            )
+        }
+    )
+
+    learning_progress[session_id] = (
+        learning_progress[session_id][-MAX_PROGRESS_ITEMS:]
+    )
+
+
+# ============================================================
 # Helper: Resolve Conversation Context
 # ============================================================
 
-def resolve_context(question: str, history: list):
+def resolve_context(
+    question: str,
+    history: list,
+    progress: list
+):
 
-    if not history:
+    if not history and not progress:
         return question
 
     history_text = "\n".join(
@@ -379,6 +516,12 @@ def resolve_context(question: str, history: list):
             f"Assistant: {item['answer']}"
             for item in history[-MAX_HISTORY:]
         ]
+    )
+
+    progress_text = json.dumps(
+        progress[-MAX_PROGRESS_ITEMS:],
+        ensure_ascii=False,
+        indent=2
     )
 
     messages = [
@@ -390,24 +533,34 @@ def resolve_context(question: str, history: list):
 
                 "Your job is to convert the CURRENT user question "
                 "into a standalone question when it depends on "
-                "previous conversation.\n\n"
+                "previous conversation or explicitly stored learning "
+                "progress.\n\n"
 
                 "Rules:\n"
                 "1. Use previous conversation only when necessary.\n"
-                "2. Resolve words like it, this, that, these, those, "
+                "2. Use learning progress only when it is relevant.\n"
+                "3. Resolve words like it, this, that, these, those, "
                 "same subject, continue, change, modify, add, remove, "
                 "make it easier, make it harder, etc.\n"
-                "3. Preserve the user's actual requested change.\n"
-                "4. If the current question is already standalone, "
+                "4. Preserve the user's actual requested change.\n"
+                "5. If the current question is already standalone, "
                 "return it unchanged.\n"
-                "5. Return ONLY the resolved standalone question.\n"
-                "6. Do not answer the question.\n\n"
+                "6. Do not invent learning scores or progress.\n"
+                "7. Do not answer the question.\n"
+                "8. Return ONLY the resolved standalone question.\n\n"
 
                 "Example:\n"
                 "Previous: User created a Biology study plan.\n"
                 "Current: Make it 2 hours per day.\n"
                 "Resolved: Change the Biology study plan to 2 hours "
-                "per day.\n"
+                "per day.\n\n"
+
+                "Learning progress example:\n"
+                "Stored progress: User scored 60% in photosynthesis.\n"
+                "Current: What should I revise next?\n"
+                "Resolved: Based on my Biology learning progress, "
+                "what should I revise next, considering my photosynthesis "
+                "quiz score?"
             )
         },
         {
@@ -415,6 +568,10 @@ def resolve_context(question: str, history: list):
             "content": (
                 "Previous conversation:\n\n"
                 f"{history_text}\n\n"
+
+                "Stored learning progress:\n\n"
+                f"{progress_text}\n\n"
+
                 "Current user question:\n"
                 f"{question}"
             )
@@ -436,12 +593,14 @@ def resolve_context(question: str, history: list):
 
         resolved = resolved.strip()
 
-        return resolved if resolved else question
+        return (
+            resolved
+            if resolved
+            else question
+        )
 
     except Exception:
 
-        # If context resolution fails,
-        # continue safely with the original question.
         return question
 
 
@@ -479,10 +638,38 @@ def ask_agent(
         []
     )
 
-    # Resolve current question using previous conversation
+    progress = learning_progress.get(
+        session_id,
+        []
+    )
+
+    # ========================================================
+    # STEP 0.5 — EXTRACT LEARNING PROGRESS
+    # ========================================================
+
+    progress_data = extract_learning_progress(
+        question
+    )
+
+    save_learning_progress(
+        session_id,
+        progress_data
+    )
+
+    # Reload progress after saving
+    progress = learning_progress.get(
+        session_id,
+        []
+    )
+
+    # ========================================================
+    # STEP 0.6 — RESOLVE CONTEXT
+    # ========================================================
+
     contextual_question = resolve_context(
         question,
-        history
+        history,
+        progress
     )
 
     tool_trace = []
@@ -817,6 +1004,7 @@ def ask_agent(
         "user_question": question,
         "resolved_question": contextual_question,
         "detected_intents": intents,
+        "learning_progress": progress,
         "tool_results": tool_results
     }
 
@@ -828,7 +1016,7 @@ def ask_agent(
                 "assistant.\n\n"
 
                 "Answer the user's question using the tool "
-                "results provided below.\n\n"
+                "results and learning progress provided below.\n\n"
 
                 "IMPORTANT RULES:\n"
                 "1. Use the calculator result for numerical answers.\n"
@@ -840,8 +1028,10 @@ def ask_agent(
                 "5. If a tool failed or information is insufficient, "
                 "clearly say so.\n"
                 "6. If multiple tasks exist, answer ALL of them.\n"
-                "7. Give a clear, well-structured educational answer.\n"
-                "8. Do not mention internal orchestration unless "
+                "7. Use stored learning progress only when relevant.\n"
+                "8. Never invent or assume a user's score.\n"
+                "9. Give a clear, well-structured educational answer.\n"
+                "10. Do not mention internal orchestration unless "
                 "the user asks about it."
             )
         },
@@ -892,7 +1082,6 @@ def ask_agent(
         }
     )
 
-    # Keep only recent conversations
     conversation_memory[session_id] = (
         conversation_memory[session_id][-MAX_HISTORY:]
     )
