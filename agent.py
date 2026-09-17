@@ -799,6 +799,18 @@ def ask_agent(
     # ========================================================
     # STEP 1 — EDUCATION ROUTER
     # ========================================================
+    router_trace = {
+        "step": 1,
+        "tool": "education_router",
+        "status": "running",
+        "arguments": json.dumps(
+            {
+                "intents": []
+            }
+        )
+    }
+
+    tool_trace.append(router_trace)
 
     router_messages = [
         {
