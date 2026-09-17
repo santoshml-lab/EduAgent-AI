@@ -799,6 +799,7 @@ def ask_agent(
     # ========================================================
     # STEP 1 — EDUCATION ROUTER
     # ========================================================
+
     router_trace = {
         "step": 1,
         "tool": "education_router",
@@ -896,7 +897,7 @@ def ask_agent(
             "role": "user",
             "content": contextual_question
         }
-        ]
+    ]
 
     try:
 
@@ -904,12 +905,7 @@ def ask_agent(
             model="openai/gpt-oss-20b",
             messages=router_messages,
             tools=TOOLS,
-            tool_choice={
-                "type": "function",
-                tool_choice="required"
-                    
-                
-            
+            tool_choice="required",
             temperature=0
         )
 
@@ -1382,7 +1378,7 @@ def ask_agent(
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-    }
+        }
                 
 
 
