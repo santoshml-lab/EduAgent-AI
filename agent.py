@@ -800,20 +800,7 @@ def ask_agent(
     # STEP 1 — EDUCATION ROUTER
     # ========================================================
 
-    router_trace = {
-        "step": 1,
-        "tool": "education_router",
-        "status": "running",
-        "arguments": json.dumps(
-            {
-                "intents": []
-            }
-        )
-    }
-
-    tool_trace.append(router_trace)
-
-    router_messages = [
+        router_messages = [
         {
             "role": "system",
             "content": (
@@ -831,25 +818,64 @@ def ask_agent(
                 "- weak_topic\n"
                 "- quiz_result\n\n"
 
-                "IMPORTANT:\n"
+                "IMPORTANT ROUTING RULES:\n\n"
+
+                "QUIZ RESULT RULE:\n"
+                "If the user explicitly reports a quiz or test score, "
+                "such as 'I scored 80%', 'I got 65%', "
+                "'I scored 8 out of 10', or similar performance "
+                "information, use quiz_result.\n\n"
+
+                "If the user reports a score and asks to analyze, "
+                "interpret, classify, evaluate, or understand "
+                "their performance, use quiz_result.\n\n"
+
+                "A quiz score must route to quiz_result regardless "
+                "of whether the score is high, medium, or low.\n\n"
+
+                "Do NOT use weak_topic merely because a score is "
+                "mentioned.\n\n"
+
+                "WEAK TOPIC RULE:\n"
                 "Use weak_topic when the user asks about weak areas, "
-                "what topic needs revision, what should be revised next, "
-                "or which learning topics need more revision based on "
-                "stored performance.\n\n"
+                "what topic needs revision, what should be revised "
+                "next, or which learning topics need more revision "
+                "based on stored learning performance.\n\n"
 
-                "Use quiz_result when the user explicitly provides "
-                "a quiz/test score and asks to analyze or classify "
-                "their performance.\n\n"
+                "STUDY PLAN RULE:\n"
+                "Use study_plan when the user explicitly asks for "
+                "a study schedule or study plan.\n\n"
 
-                "Use study_plan when the user explicitly asks for a "
-                "study schedule or study plan.\n\n"
+                "QUIZ GENERATOR RULE:\n"
+                "Use quiz when the user asks to create or generate "
+                "a quiz, test, MCQs, or practice questions.\n\n"
 
-                "If the user asks what to revise next based on learning "
-                "performance, prefer weak_topic. If they also explicitly "
-                "ask for a study plan, return both weak_topic and "
-                "study_plan.\n\n"
+                "EXPLANATION RULE:\n"
+                "Use explanation when the user asks to explain or "
+                "learn an educational concept.\n\n"
 
+                "NUMERICAL RULE:\n"
+                "Use numerical when the user asks to calculate or "
+                "solve a mathematical/numerical problem.\n\n"
+
+                "CURRENT INFORMATION RULE:\n"
+                "Use current_information when the user asks for "
+                "latest, current, recent, today's, or otherwise "
+                "time-sensitive information.\n\n"
+
+                "MULTIPLE INTENTS:\n"
                 "If multiple tasks exist, return ALL applicable intents.\n\n"
+
+                "PRIORITY:\n"
+                "1. Explicit quiz/test score + performance analysis "
+                "-> quiz_result\n"
+                "2. Weak-topic/revision request based on stored progress "
+                "-> weak_topic\n"
+                "3. Explicit study schedule request -> study_plan\n"
+                "4. Quiz creation request -> quiz\n"
+                "5. Numerical calculation -> numerical\n"
+                "6. Current/latest information -> current_information\n"
+                "7. Concept learning/explanation -> explanation\n\n"
 
                 "Do not answer the user's question."
             )
@@ -858,7 +884,7 @@ def ask_agent(
             "role": "user",
             "content": contextual_question
         }
-    ]
+        ]
 
     try:
 
