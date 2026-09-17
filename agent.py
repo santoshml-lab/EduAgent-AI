@@ -606,7 +606,6 @@ def resolve_context(
 
         return question
 
-
 # ============================================================
 # Helper: Execute Quiz Result Analyzer
 # ============================================================
@@ -648,33 +647,68 @@ def execute_quiz_result(question: str):
             temperature=0
         )
 
-        content = response.choices[0].message.content or "{}"
+        content = (
+            response.choices[0].message.content
+            or "{}"
+        )
 
-        content = content.replace("```json", "")
-        content = content.replace("```", "")
+        content = content.replace(
+            "```json",
+            ""
+        )
+
+        content = content.replace(
+            "```",
+            ""
+        )
+
         content = content.strip()
 
-        # Extract the first JSON object from the model response
+        # ----------------------------------------------------
+        # Extract JSON object from model response
+        # ----------------------------------------------------
+
         json_match = re.search(
-        r"\{.*\}",
-        content,
-        re.DOTALL
-)
-
-       if not json_match:
-
-         return {
-        "success": False,
-        "result": (
-            "Quiz result analyzer error: "
-            "No valid JSON object found in model response."
+            r"\{.*\}",
+            content,
+            re.DOTALL
         )
-    }
+
+        if not json_match:
+
+            return {
+                "success": False,
+                "result": (
+                    "Quiz result analyzer error: "
+                    "No valid JSON object found in model response."
+                )
+            }
 
         json_text = json_match.group(0)
 
-        params = json.loads(json_text)
-        
+        # ----------------------------------------------------
+        # Parse JSON
+        # ----------------------------------------------------
+
+        try:
+
+            params = json.loads(
+                json_text
+            )
+
+        except json.JSONDecodeError as e:
+
+            return {
+                "success": False,
+                "result": (
+                    "Quiz result analyzer JSON parsing error: "
+                    f"{str(e)}"
+                )
+            }
+
+        # ----------------------------------------------------
+        # Extract parameters safely
+        # ----------------------------------------------------
 
         subject = params.get(
             "subject",
@@ -686,31 +720,70 @@ def execute_quiz_result(question: str):
             ""
         )
 
-        score = float(
-            params.get(
-                "score",
-                0
-            )
+        raw_score = params.get(
+            "score"
         )
+
+        if raw_score is None:
+
+            return {
+                "success": False,
+                "result": (
+                    "Quiz result analyzer error: "
+                    "No score was found in the extracted result."
+                )
+            }
+
+        try:
+
+            score = float(
+                raw_score
+            )
+
+        except (TypeError, ValueError):
+
+            return {
+                "success": False,
+                "result": (
+                    "Quiz result analyzer error: "
+                    "Score is not a valid number."
+                )
+            }
 
         score_type = params.get(
             "score_type",
             "percentage"
         )
 
-        total_questions = int(
-            params.get(
-                "total_questions",
-                0
-            )
-        )
+        try:
 
-        correct_answers = int(
-            params.get(
-                "correct_answers",
-                0
+            total_questions = int(
+                params.get(
+                    "total_questions",
+                    0
+                )
             )
-        )
+
+        except (TypeError, ValueError):
+
+            total_questions = 0
+
+        try:
+
+            correct_answers = int(
+                params.get(
+                    "correct_answers",
+                    0
+                )
+            )
+
+        except (TypeError, ValueError):
+
+            correct_answers = 0
+
+        # ----------------------------------------------------
+        # Run Quiz Result Analyzer
+        # ----------------------------------------------------
 
         result = quiz_result_analyzer(
             subject=subject,
@@ -734,6 +807,15 @@ def execute_quiz_result(question: str):
                 f"Quiz result analyzer error: {str(e)}"
             )
         }
+
+
+
+
+
+                
+        
+                
+            
 
 
 # ============================================================
