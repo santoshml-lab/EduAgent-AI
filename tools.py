@@ -301,6 +301,48 @@ def study_plan_generator(
         "self-assessment where appropriate."
     )
 
+# ========================================
+# Weak Topic Detector
+# ========================================
+def weak_topic_detector(progress):
+    """
+    Identify learning topics that need more revision
+    based on explicitly recorded performance scores.
+    """
+
+    weak_topics = []
+
+    for item in progress:
+
+        score = item.get("score")
+
+        if score is None:
+            continue
+
+        score_type = item.get(
+            "score_type"
+        )
+
+        if score_type == "percentage" and score < 70:
+
+            weak_topics.append({
+                "subject": item.get(
+                    "subject",
+                    ""
+                ),
+                "topic": item.get(
+                    "topic",
+                    ""
+                ),
+                "score": score,
+                "reason": "Score is below 70%"
+            })
+
+    return json.dumps(
+        weak_topics,
+        ensure_ascii=False
+    )
+
 
 # ========================================
 # Tool Definitions
