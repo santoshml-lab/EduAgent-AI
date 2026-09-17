@@ -42,7 +42,10 @@ def web_search(query: str):
             "q": query
         })
 
-        organic_results = results.get("organic_results", [])
+        organic_results = results.get(
+            "organic_results",
+            []
+        )
 
         if not organic_results:
             return json.dumps({
@@ -51,37 +54,51 @@ def web_search(query: str):
 
         sources = []
 
-        for index, result in enumerate(organic_results[:5], start=1):
+        for index, result in enumerate(
+            organic_results[:5],
+            start=1
+        ):
             sources.append({
                 "source_id": f"source_{index}",
-                "title": result.get("title", ""),
-                "url": result.get("link", ""),
-                "content": result.get("snippet", "")
+                "title": result.get(
+                    "title",
+                    ""
+                ),
+                "url": result.get(
+                    "link",
+                    ""
+                ),
+                "content": result.get(
+                    "snippet",
+                    ""
+                )
             })
 
-        return json.dumps(sources, ensure_ascii=False)
+        return json.dumps(
+            sources,
+            ensure_ascii=False
+        )
 
     except Exception as e:
-        return json.dumps({
-            "error": f"Web search failed: {str(e)}"
-        })
 
-    
-        
-            
-            
+        return json.dumps({
+            "error": (
+                f"Web search failed: {str(e)}"
+            )
+        })
 
 
 # ========================================
 # Education Router
 # ========================================
-def education_router(intent: str):
+def education_router(intents):
     """
-    Identify the type of education task
+    Identify one or more education task types
     and return the recommended workflow.
     """
 
     workflows = {
+
         "explanation": (
             "Workflow: explanation. "
             "Explain the educational concept clearly "
@@ -109,18 +126,54 @@ def education_router(intent: str):
         "current_information": (
             "Workflow: current_information. "
             "Use the web_search tool to retrieve current "
-            "or up-to-date educational information."
+            "or up-to-date information."
         )
     }
 
-    if intent not in workflows:
+    # ----------------------------------------
+    # Convert single string to list
+    # ----------------------------------------
+    if isinstance(intents, str):
+
+        intents = [intents]
+
+    # ----------------------------------------
+    # Validate intents
+    # ----------------------------------------
+    valid_intents = []
+
+    for intent in intents:
+
+        if intent in workflows:
+
+            valid_intents.append(intent)
+
+    # ----------------------------------------
+    # No valid intent
+    # ----------------------------------------
+    if not valid_intents:
+
         return (
             "Unknown education intent. "
-            "Use one of: explanation, numerical, quiz, "
-            "study_plan, current_information."
+            "Use one or more of: explanation, "
+            "numerical, quiz, study_plan, "
+            "current_information."
         )
 
-    return workflows[intent]
+    # ----------------------------------------
+    # Build workflow result
+    # ----------------------------------------
+    selected_workflows = []
+
+    for intent in valid_intents:
+
+        selected_workflows.append(
+            workflows[intent]
+        )
+
+    return "\n".join(
+        selected_workflows
+    )
 
 
 # ========================================
@@ -137,18 +190,26 @@ def quiz_generator(
     generating an educational quiz.
     """
 
+    # ----------------------------------------
+    # Validate question count
+    # ----------------------------------------
     if number_of_questions < 1:
+
         return (
             "Quiz error: number_of_questions "
             "must be at least 1."
         )
 
     if number_of_questions > 20:
+
         return (
             "Quiz error: maximum 20 questions "
             "are allowed."
         )
 
+    # ----------------------------------------
+    # Validate difficulty
+    # ----------------------------------------
     allowed_difficulties = {
         "easy",
         "medium",
@@ -156,11 +217,15 @@ def quiz_generator(
     }
 
     if difficulty.lower() not in allowed_difficulties:
+
         return (
             "Quiz error: difficulty must be "
             "easy, medium, or hard."
         )
 
+    # ----------------------------------------
+    # Generate instructions
+    # ----------------------------------------
     return (
         f"Create a {number_of_questions}-question quiz.\n"
         f"Subject: {subject}\n"
@@ -187,35 +252,50 @@ def study_plan_generator(
     study plan.
     """
 
+    # ----------------------------------------
+    # Validate days
+    # ----------------------------------------
     if days < 1:
+
         return (
             "Study plan error: days must be "
             "at least 1."
         )
 
     if days > 30:
+
         return (
             "Study plan error: maximum 30 days "
             "are allowed."
         )
 
+    # ----------------------------------------
+    # Validate hours
+    # ----------------------------------------
     if hours_per_day <= 0:
+
         return (
             "Study plan error: hours_per_day "
             "must be greater than 0."
         )
 
     if hours_per_day > 12:
+
         return (
             "Study plan error: hours_per_day "
             "cannot exceed 12."
         )
 
+    # ----------------------------------------
+    # Generate instructions
+    # ----------------------------------------
     return (
         f"Create a {days}-day study plan.\n"
         f"Subject: {subject}\n"
-        f"Study time per day: {hours_per_day} hours\n"
-        f"Topics: {topics if topics else 'Not specified'}\n\n"
+        f"Study time per day: "
+        f"{hours_per_day} hours\n"
+        f"Topics: "
+        f"{topics if topics else 'Not specified'}\n\n"
         "Create a practical day-by-day study schedule. "
         "Include learning, revision, practice, and "
         "self-assessment where appropriate."
@@ -227,27 +307,37 @@ def study_plan_generator(
 # ========================================
 TOOLS = [
 
-    # ------------------------------------
+    # ====================================
     # Calculator
-    # ------------------------------------
+    # ====================================
     {
         "type": "function",
+
         "function": {
+
             "name": "calculator",
+
             "description": (
                 "Perform mathematical calculations."
             ),
+
             "parameters": {
+
                 "type": "object",
+
                 "properties": {
+
                     "expression": {
+
                         "type": "string",
+
                         "description": (
                             "Mathematical expression "
                             "to calculate."
                         )
                     }
                 },
+
                 "required": [
                     "expression"
                 ]
@@ -255,27 +345,38 @@ TOOLS = [
         }
     },
 
-    # ------------------------------------
+
+    # ====================================
     # Web Search
-    # ------------------------------------
+    # ====================================
     {
         "type": "function",
+
         "function": {
+
             "name": "web_search",
+
             "description": (
                 "Search the web for current, "
                 "recent, or up-to-date information."
             ),
+
             "parameters": {
+
                 "type": "object",
+
                 "properties": {
+
                     "query": {
+
                         "type": "string",
+
                         "description": (
                             "The web search query."
                         )
                     }
                 },
+
                 "required": [
                     "query"
                 ]
@@ -283,86 +384,130 @@ TOOLS = [
         }
     },
 
-    # ------------------------------------
+
+    # ====================================
     # Education Router
-    # ------------------------------------
+    # ====================================
     {
         "type": "function",
+
         "function": {
+
             "name": "education_router",
+
             "description": (
-                "Identify the type of education "
-                "task requested by the user and "
-                "return the appropriate workflow."
+                "Identify ALL education task types "
+                "requested by the user. "
+                "For a multi-task question, return "
+                "ALL applicable task categories."
             ),
+
             "parameters": {
+
                 "type": "object",
+
                 "properties": {
-                    "intent": {
-                        "type": "string",
-                        "enum": [
-                            "explanation",
-                            "numerical",
-                            "quiz",
-                            "study_plan",
-                            "current_information"
-                        ],
+
+                    "intents": {
+
+                        "type": "array",
+
+                        "items": {
+
+                            "type": "string",
+
+                            "enum": [
+                                "explanation",
+                                "numerical",
+                                "quiz",
+                                "study_plan",
+                                "current_information"
+                            ]
+                        },
+
+                        "minItems": 1,
+
                         "description": (
-                            "The education task category."
+                            "One or more education task "
+                            "categories. For multiple "
+                            "tasks, include ALL applicable "
+                            "categories."
                         )
                     }
                 },
+
                 "required": [
-                    "intent"
+                    "intents"
                 ]
             }
         }
     },
 
-    # ------------------------------------
+
+    # ====================================
     # Quiz Generator
-    # ------------------------------------
+    # ====================================
     {
         "type": "function",
+
         "function": {
+
             "name": "quiz_generator",
+
             "description": (
                 "Generate a structured educational "
                 "quiz for a given subject and topic."
             ),
+
             "parameters": {
+
                 "type": "object",
+
                 "properties": {
+
                     "subject": {
+
                         "type": "string",
+
                         "description": (
                             "The academic subject."
                         )
                     },
+
                     "topic": {
+
                         "type": "string",
+
                         "description": (
                             "The topic for the quiz."
                         )
                     },
+
                     "number_of_questions": {
+
                         "type": "integer",
+
                         "description": (
                             "Number of quiz questions."
                         )
                     },
+
                     "difficulty": {
+
                         "type": "string",
+
                         "enum": [
                             "easy",
                             "medium",
                             "hard"
                         ],
+
                         "description": (
                             "Quiz difficulty level."
                         )
                     }
                 },
+
                 "required": [
                     "subject",
                     "topic"
@@ -371,48 +516,68 @@ TOOLS = [
         }
     },
 
-    # ------------------------------------
+
+    # ====================================
     # Study Plan Generator
-    # ------------------------------------
+    # ====================================
     {
         "type": "function",
+
         "function": {
+
             "name": "study_plan_generator",
+
             "description": (
                 "Generate a structured educational "
                 "study plan for a subject."
             ),
+
             "parameters": {
+
                 "type": "object",
+
                 "properties": {
+
                     "subject": {
+
                         "type": "string",
+
                         "description": (
                             "The academic subject."
                         )
                     },
+
                     "days": {
+
                         "type": "integer",
+
                         "description": (
                             "Number of days available "
                             "for study."
                         )
                     },
+
                     "hours_per_day": {
+
                         "type": "number",
+
                         "description": (
                             "Available study hours "
                             "per day."
                         )
                     },
+
                     "topics": {
+
                         "type": "string",
+
                         "description": (
                             "Topics that should be "
                             "included in the study plan."
                         )
                     }
                 },
+
                 "required": [
                     "subject",
                     "days",
@@ -422,7 +587,7 @@ TOOLS = [
         }
     }
 
-]
+    ]
 
                     
 
