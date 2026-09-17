@@ -37,7 +37,7 @@ def ask_agent(question: str):
                 "Always convert the calculation into a valid mathematical expression "
                 "before calling calculator. Do not send natural-language expressions "
                 "such as '25% of 2400'. For example, convert 25% of 2400 into "
-                "'0.25 * 2400'.\n" 
+                "'0.25 * 2400'.\n"
                 "4. For quiz requests, use quiz_generator after routing.\n"
                 "5. For study-plan requests, use study_plan_generator after routing.\n"
                 "6. For current-information requests, use web_search after routing.\n"
@@ -87,7 +87,8 @@ def ask_agent(question: str):
                     "EduAgent AI could not contact the AI service. "
                     f"Error: {str(e)}"
                 ),
-                "tool_trace": tool_trace
+                "tool_trace": tool_trace,
+                "sources": []
             }
 
         message = response.choices[0].message
@@ -101,24 +102,10 @@ def ask_agent(question: str):
                 "I could not generate a final answer."
             )
 
-            # ========================================
-            # Add Web Sources
-            # ========================================
-            if web_sources:
-
-                final_answer += "\n\n## Sources\n\n"
-
-                for source in web_sources:
-
-                    final_answer += (
-                        f"[Source {source['source_id']}] "
-                        f"{source['title']}\n"
-                        f"{source['url']}\n\n"
-                    )
-
             return {
                 "answer": final_answer,
-                "tool_trace": tool_trace
+                "tool_trace": tool_trace,
+                "sources": web_sources
             }
 
         # ========================================
@@ -337,7 +324,7 @@ def ask_agent(question: str):
                 except Exception as e:
 
                     result = (
-                        f"Study plan generator tool error: {str(e)}"
+                        f"Study plan generator error: {str(e)}"
                     )
 
             # ========================================
