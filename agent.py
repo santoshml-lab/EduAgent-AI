@@ -10,6 +10,7 @@ from tools import (
     education_router,
     quiz_generator,
     study_plan_generator,
+    weak_topic_detector,
     TOOLS
 )
 
@@ -394,7 +395,7 @@ def extract_learning_progress(question: str):
                 "Example:\n"
                 "User: I scored 60% in my photosynthesis quiz.\n"
                 "JSON: {\n"
-                "  \"subject\": \"Biology\",\n"
+                "  \"subject\": \"\",\n"
                 "  \"topic\": \"photosynthesis\",\n"
                 "  \"score\": 60,\n"
                 "  \"score_type\": \"percentage\",\n"
@@ -656,13 +657,20 @@ def ask_agent(
         progress_data
     )
 
-    # Reload progress after saving
     progress = learning_progress.get(
         session_id,
         []
     )
-    print("DEBUG LEARNING PROGRESS:", progress)
-    print("DEBUG SESSION ID:", session_id)
+
+    print(
+        "DEBUG LEARNING PROGRESS:",
+        progress
+    )
+
+    print(
+        "DEBUG SESSION ID:",
+        session_id
+    )
 
     # ========================================================
     # STEP 0.6 — RESOLVE CONTEXT
@@ -708,9 +716,23 @@ def ask_agent(
                 "- numerical\n"
                 "- quiz\n"
                 "- study_plan\n"
-                "- current_information\n\n"
+                "- current_information\n"
+                "- weak_topic\n\n"
 
                 "IMPORTANT:\n"
+                "Use weak_topic when the user asks about weak areas, "
+                "what topic needs revision, what should be revised next, "
+                "or which learning topics need more revision based on "
+                "stored performance.\n\n"
+
+                "Use study_plan when the user explicitly asks for a "
+                "study schedule or study plan.\n\n"
+
+                "If the user asks what to revise next based on learning "
+                "performance, prefer weak_topic. If they also explicitly "
+                "ask for a study plan, return both weak_topic and "
+                "study_plan.\n\n"
+
                 "If multiple tasks exist, return ALL applicable intents.\n\n"
 
                 "Do not answer the user's question."
@@ -998,6 +1020,60 @@ def ask_agent(
             }
         )
 
+    # --------------------------------------------------------
+    # Weak Topic Detector
+    # --------------------------------------------------------
+
+    if "weak_topic" in intents:
+
+        trace = {
+            "step": len(tool_trace) + 1,
+            "tool": "weak_topic_detector",
+            "status": "running",
+            "arguments": json.dumps(
+                {
+                    "progress_items": len(progress)
+                },
+                ensure_ascii=False
+            )
+        }
+
+        tool_trace.append(trace)
+
+        try:
+
+            weak_topic_result = weak_topic_detector(
+                progress
+            )
+
+            trace["status"] = "success"
+
+            tool_results.append(
+                {
+                    "tool": "weak_topic_detector",
+                    "data": {
+                        "success": True,
+                        "result": weak_topic_result
+                    }
+                }
+            )
+
+        except Exception as e:
+
+            trace["status"] = "error"
+
+            tool_results.append(
+                {
+                    "tool": "weak_topic_detector",
+                    "data": {
+                        "success": False,
+                        "result": (
+                            f"Weak topic detector error: {str(e)}"
+                        )
+                    }
+                }
+            )
+
     # ========================================================
     # STEP 3 — FINAL AI RESPONSE
     # ========================================================
@@ -1032,8 +1108,15 @@ def ask_agent(
                 "6. If multiple tasks exist, answer ALL of them.\n"
                 "7. Use stored learning progress only when relevant.\n"
                 "8. Never invent or assume a user's score.\n"
-                "9. Give a clear, well-structured educational answer.\n"
-                "10. Do not mention internal orchestration unless "
+                "9. When weak_topic_detector returns weak topics, "
+                "clearly identify those topics and explain that they "
+                "are flagged because their recorded percentage score "
+                "is below 70%.\n"
+                "10. If no weak topics are returned, do not invent any. "
+                "Say that no recorded topic currently meets the "
+                "weak-topic threshold.\n"
+                "11. Give a clear, well-structured educational answer.\n"
+                "12. Do not mention internal orchestration unless "
                 "the user asks about it."
             )
         },
@@ -1106,4 +1189,7 @@ def ask_agent(
         "tool_trace": tool_trace,
         "sources": web_sources
     }
+
+
+
 
