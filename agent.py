@@ -1369,6 +1369,48 @@ def ask_agent(
             )
 
     # --------------------------------------------------------
+    # Targeted Revision
+    # --------------------------------------------------------
+
+   if "weak_topic" in intents:
+
+      trace = {
+        "step": len(tool_trace) + 1,
+        "tool": "targeted_revision",
+        "status": "running",
+        "arguments": json.dumps(
+            {
+                "progress_items": len(progress)
+            },
+            ensure_ascii=False
+        )
+    }
+
+    tool_trace.append(trace)
+
+    revision_result = generate_targeted_revision(
+        progress
+    )
+
+    trace["status"] = (
+        "success"
+        if revision_result["success"]
+        else "error"
+    )
+
+    trace["result"] = revision_result.get(
+        "result",
+        ""
+    )
+
+    tool_results.append(
+        {
+            "tool": "targeted_revision",
+            "data": revision_result
+        }
+    )
+
+    # --------------------------------------------------------
     # Quiz Result Analyzer
     # --------------------------------------------------------
 
