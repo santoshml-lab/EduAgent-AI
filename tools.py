@@ -2,8 +2,12 @@ import os
 import json
 import serpapi
 from dotenv import load_dotenv
+from groq import Groq
 
 load_dotenv()
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 
 # ========================================
@@ -128,7 +132,7 @@ def education_router(intents):
         ensure_ascii=False
     )
 
-6
+
 # ========================================
 # Quiz Generator
 # ========================================
@@ -140,34 +144,138 @@ def quiz_generator(
     difficulty: str = "medium"
 ):
 
-    if number_of_questions < 1:
-        number_of_questions = 1
+    # Keep quiz size within allowed range
+    number_of_questions = max(
+        1,
+        min(number_of_questions, 20)
+    )
 
-    if number_of_questions > 20:
-        number_of_questions = 20
-
+    # Validate difficulty
     if difficulty not in [
         "easy",
         "medium",
         "hard"
     ]:
-
         difficulty = "medium"
 
-    return json.dumps(
-        {
-            "subject": subject,
-            "topic": topic,
-            "number_of_questions": number_of_questions,
-            "difficulty": difficulty,
-            "instruction": (
-                f"Generate {number_of_questions} "
-                f"{difficulty}-difficulty questions "
-                f"on {topic} in {subject}."
+    prompt = f"""
+Generate exactly {number_of_questions} multiple-choice questions.
+
+Subject: {subject}
+Topic: {topic}
+Difficulty: {difficulty}
+
+Requirements:
+
+1. Generate exactly {number_of_questions} questions.
+2. Each question must have exactly 4 options.
+3. Options must be A, B, C and D.
+4. Only one option must be correct.
+5. Include the correct answer for every question.
+6. Include a short explanation for every correct answer.
+7. Do not add questions outside the requested topic.
+8. Return ONLY valid JSON.
+9. Do not use Markdown.
+10. Do not include ```json or ```.
+
+Use this exact JSON structure:
+
+{{
+  "subject": "{subject}",
+  "topic": "{topic}",
+  "difficulty": "{difficulty}",
+  "questions": [
+    {{
+      "question": "Question text",
+      "options": {{
+        "A": "Option A",
+        "B": "Option B",
+        "C": "Option C",
+        "D": "Option D"
+      }},
+      "correct_answer": "A",
+      "explanation": "Short explanation"
+    }}
+  ]
+}}
+"""
+
+    try:
+
+        response = client.chat.completions.create(
+
+            model="openai/gpt-oss-20b",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert educational "
+                        "quiz generator. Return only valid JSON."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+
+            temperature=0.3
+        )
+
+        content = response.choices[0].message.content.strip()
+
+        # Remove accidental Markdown fences
+        content = re.sub(
+            r"^```json\s*",
+            "",
+            content,
+            flags=re.IGNORECASE
+        )
+
+        content = re.sub(
+            r"\s*```$",
+            "",
+            content
+        )
+
+        quiz_data = json.loads(content)
+
+        # Basic validation
+        if not isinstance(
+            quiz_data.get("questions"),
+            list
+        ):
+
+            raise ValueError(
+                "Quiz questions are missing."
             )
-        },
-        ensure_ascii=False
-    )
+
+        if len(
+            quiz_data["questions"]
+        ) != number_of_questions:
+
+            raise ValueError(
+                f"Expected {number_of_questions} questions, "
+                f"but received {len(quiz_data['questions'])}."
+            )
+
+        return json.dumps(
+            quiz_data,
+            ensure_ascii=False
+        )
+
+    except Exception as e:
+
+        return json.dumps(
+            {
+                "error": f"Quiz generation error: {str(e)}"
+            },
+            ensure_ascii=False
+        )
+
+
+            
 
 
 # ========================================
