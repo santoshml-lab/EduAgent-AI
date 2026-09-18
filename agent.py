@@ -1369,12 +1369,12 @@ def ask_agent(
             )
 
     # --------------------------------------------------------
-    # Targeted Revision
-    # --------------------------------------------------------
+# Targeted Revision
+# --------------------------------------------------------
 
-   if "weak_topic" in intents:
+if "weak_topic" in intents:
 
-      trace = {
+    trace = {
         "step": len(tool_trace) + 1,
         "tool": "targeted_revision",
         "status": "running",
@@ -1409,6 +1409,8 @@ def ask_agent(
             "data": revision_result
         }
     )
+
+    
 
     # --------------------------------------------------------
     # Quiz Result Analyzer
