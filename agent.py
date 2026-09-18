@@ -760,6 +760,72 @@ def execute_quiz_result(question: str):
             )
         }
 
+# ============================================================
+# Helper: Generate Targeted Revision
+# ============================================================
+
+def generate_targeted_revision(
+    progress: list
+):
+
+    weak_topics = weak_topic_detector(
+        progress
+    )
+
+    try:
+
+        weak_topics_data = json.loads(
+            weak_topics
+        )
+
+    except Exception:
+
+        return {
+            "success": False,
+            "result": "Could not read weak topics."
+        }
+
+    if not weak_topics_data:
+
+        return {
+            "success": True,
+            "result": (
+                "No weak topics are currently recorded."
+            )
+        }
+
+    revision_items = []
+
+    for item in weak_topics_data:
+
+        revision_items.append(
+            {
+                "subject": item.get(
+                    "subject",
+                    ""
+                ),
+                "topic": item.get(
+                    "topic",
+                    ""
+                ),
+                "score": item.get(
+                    "score"
+                ),
+                "revision_action": (
+                    "Revise the core concepts and "
+                    "practice targeted questions."
+                )
+            }
+        )
+
+    return {
+        "success": True,
+        "result": json.dumps(
+            revision_items,
+            ensure_ascii=False
+        )
+    }
+
 
 
     
