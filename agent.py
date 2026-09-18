@@ -714,6 +714,72 @@ def ask_agent(
         question,
         session_id
     )
+    # ============================================================
+# Direct Quiz Result Detection
+# ============================================================
+
+quiz_result_match = re.search(
+    r"\b(?:scored|got|achieved|received)\s+(\d+(?:\.\d+)?)\s*%",
+    standalone_question,
+    re.IGNORECASE
+)
+
+if quiz_result_match:
+
+    quiz_result_analysis = execute_quiz_result(
+        standalone_question
+    )
+
+    tool_trace = [
+        {
+            "step": 1,
+            "tool": "quiz_result_analyzer",
+            "status": (
+                "success"
+                if quiz_result_analysis["success"]
+                else "error"
+            ),
+            "arguments": json.dumps(
+                {
+                    "question": standalone_question
+                },
+                ensure_ascii=False
+            ),
+            "result": quiz_result_analysis.get(
+                "result",
+                ""
+            )
+        }
+    ]
+
+    answer = quiz_result_analysis.get(
+        "result",
+        ""
+    )
+
+    conversation_memory.setdefault(
+        session_id,
+        []
+    )
+
+    conversation_memory[session_id].append(
+        {
+            "user": question,
+            "assistant": answer
+        }
+    )
+
+    conversation_memory[session_id] = (
+        conversation_memory[session_id][
+            -MAX_HISTORY:
+        ]
+    )
+
+    return {
+        "answer": answer,
+        "tool_trace": tool_trace,
+        "sources": []
+    }
 
     # --------------------------------------------------------
     # Learning Progress Extraction
