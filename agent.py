@@ -1331,10 +1331,13 @@ def ask_agent(
             if quiz_result_analysis["success"]
             else "error"
         )
-        trace["error"] = quiz_result_analysis.get(
-            "result",
-            ""
+        trace["result"] = quiz_result_analysis.get(
+           "result",
+           ""
         )
+            
+            
+        
 
         tool_results.append(
             {
