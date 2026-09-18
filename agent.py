@@ -454,7 +454,6 @@ def extract_learning_progress(question: str):
             "note": ""
         }
 
-
 # ============================================================
 # Helper: Save Learning Progress
 # ============================================================
@@ -472,32 +471,105 @@ def save_learning_progress(
         []
     )
 
-    learning_progress[session_id].append(
-        {
-            "subject": progress.get(
-                "subject",
-                ""
-            ),
-            "topic": progress.get(
-                "topic",
-                ""
-            ),
-            "score": progress.get(
-                "score"
-            ),
-            "score_type": progress.get(
-                "score_type"
-            ),
-            "note": progress.get(
-                "note",
-                ""
-            )
-        }
+    new_record = {
+        "subject": progress.get(
+            "subject",
+            ""
+        ),
+        "topic": progress.get(
+            "topic",
+            ""
+        ),
+        "score": progress.get(
+            "score"
+        ),
+        "score_type": progress.get(
+            "score_type"
+        ),
+        "note": progress.get(
+            "note",
+            ""
+        )
+    }
+
+    topic = (
+        new_record["topic"]
+        .strip()
+        .lower()
     )
 
-    learning_progress[session_id] = (
-        learning_progress[session_id][-MAX_PROGRESS_ITEMS:]
+    subject = (
+        new_record["subject"]
+        .strip()
+        .lower()
     )
+
+    updated = False
+
+    # --------------------------------------------------------
+    # Update existing topic record
+    # --------------------------------------------------------
+
+    for index, old_record in enumerate(
+        learning_progress[session_id]
+    ):
+
+        old_topic = (
+            old_record.get(
+                "topic",
+                ""
+            )
+            .strip()
+            .lower()
+        )
+
+        old_subject = (
+            old_record.get(
+                "subject",
+                ""
+            )
+            .strip()
+            .lower()
+        )
+
+        if (
+            topic
+            and old_topic == topic
+            and old_subject == subject
+        ):
+
+            learning_progress[session_id][index] = (
+                new_record
+            )
+
+            updated = True
+
+            break
+
+    # --------------------------------------------------------
+    # Add new topic record
+    # --------------------------------------------------------
+
+    if not updated:
+
+        learning_progress[session_id].append(
+            new_record
+        )
+
+    # --------------------------------------------------------
+    # Keep memory within limit
+    # --------------------------------------------------------
+
+    learning_progress[session_id] = (
+        learning_progress[session_id][
+            -MAX_PROGRESS_ITEMS:
+        ]
+    )
+
+
+
+        
+            
 
 
 # ============================================================
