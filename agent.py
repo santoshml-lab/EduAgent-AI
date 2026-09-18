@@ -207,6 +207,32 @@ def execute_quiz(question: str):
 
             difficulty = "hard"
 
+        # ----------------------------------------------------
+        # Extract Subject
+        # ----------------------------------------------------
+
+        subject_match = re.search(
+            r"\b("
+            r"biology|physics|chemistry|"
+            r"mathematics|math|"
+            r"computer science|computer|"
+            r"history|geography|"
+            r"economics|civics"
+            r")\b",
+            question,
+            re.IGNORECASE
+        )
+
+        subject = (
+            subject_match.group(1).strip()
+            if subject_match
+            else "General Studies"
+        )
+
+        # ----------------------------------------------------
+        # Extract Topic
+        # ----------------------------------------------------
+
         topic_match = re.search(
             r"(?:on|about)\s+(.+?)(?:\s+at|\s+with|\s*$)",
             question,
@@ -220,6 +246,7 @@ def execute_quiz(question: str):
         )
 
         result = quiz_generator(
+            subject=subject,
             topic=topic,
             number_of_questions=number_of_questions,
             difficulty=difficulty
@@ -236,6 +263,9 @@ def execute_quiz(question: str):
             "success": False,
             "result": f"Quiz generation error: {str(e)}"
         }
+
+
+
 
 
 # ============================================================
