@@ -1569,10 +1569,10 @@ if "weak_topic" in intents:
         }
     )
 
-    return {
-        "answer": final_answer,
-        "tool_trace": tool_trace,
-        "sources": web_sources
+     return {
+              "answer": final_answer,
+              "tool_trace": tool_trace,
+              "sources": web_sources
         }
                 
 
