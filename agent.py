@@ -747,7 +747,7 @@ def ask_agent(
 # Direct Quiz Detection BEFORE Context Resolution
 # --------------------------------------------------------
 
-direct_quiz_query = re.search(
+  direct_quiz_query = re.search(
     r"\b("
     r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
     r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
