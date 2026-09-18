@@ -328,17 +328,20 @@ def execute_quiz(question: str):
     # --------------------------------------------------------
 
     return {
-        "subject": subject,
-        "topic": topic,
-        "number_of_questions": number_of_questions,
-        "difficulty": difficulty,
-        "instruction": (
-            f"Generate {number_of_questions} "
-            f"{difficulty}-difficulty questions "
-            f"on {topic} in {subject}."
-        ),
-        "result": result
+      "success": True,
+      "subject": subject,
+      "topic": topic,
+      "number_of_questions": number_of_questions,
+      "difficulty": difficulty,
+      "instruction": (
+        f"Generate {number_of_questions} "
+        f"{difficulty}-difficulty questions "
+        f"on {topic} in {subject}."
+    ),
+    "result": result
     }
+        
+        
 
 
 
