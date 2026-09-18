@@ -712,15 +712,40 @@ def ask_agent(
     question: str,
     session_id: str = "default"
 ):
+    
+# --------------------------------------------------------
+# Resolve Context
+# --------------------------------------------------------
 
-    # --------------------------------------------------------
-    # Resolve Context
-    # --------------------------------------------------------
-
-    standalone_question = resolve_context(
+    direct_revision_query = re.search(
+        r"\b("
+        r"what should i revise|"
+        r"what should i study|"
+        r"what do i need to revise|"
+        r"what do i need to study|"
+        r"which topic should i revise|"
+        r"which topic should i study|"
+        r"what should i work on|"
+        r"where should i focus|"
+        r"what are my weak topics|"
+        r"show my weak topics|"
+        r"find my weak topics"
+        r")\b",
         question,
-        session_id
+        re.IGNORECASE
     )
+
+    if direct_revision_query:
+
+        standalone_question = question
+
+    else:
+
+        standalone_question = resolve_context(
+            question,
+            session_id
+        )
+    
 
     # --------------------------------------------------------
     # Learning Progress Extraction
