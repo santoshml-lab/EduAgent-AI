@@ -2,7 +2,6 @@ import os
 import json
 import re
 
-
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -175,6 +174,10 @@ def execute_quiz(question: str):
 
     try:
 
+        # ----------------------------------------------------
+        # Number of Questions
+        # ----------------------------------------------------
+
         match = re.search(
             r"(\d+)\s*[-]?\s*question",
             question,
@@ -188,6 +191,10 @@ def execute_quiz(question: str):
             number_of_questions = int(
                 match.group(1)
             )
+
+        # ----------------------------------------------------
+        # Difficulty
+        # ----------------------------------------------------
 
         difficulty = "medium"
 
@@ -245,6 +252,10 @@ def execute_quiz(question: str):
             else "general"
         )
 
+        # ----------------------------------------------------
+        # Generate Quiz
+        # ----------------------------------------------------
+
         result = quiz_generator(
             subject=subject,
             topic=topic,
@@ -263,9 +274,6 @@ def execute_quiz(question: str):
             "success": False,
             "result": f"Quiz generation error: {str(e)}"
         }
-
-
-
 
 
 # ============================================================
@@ -651,90 +659,6 @@ def generate_targeted_revision(
 
 
 # ============================================================
-# Helper: Resolve Context
-# ============================================================
-
-def resolve_context(
-    question: str,
-    session_id: str
-):
-
-    history = conversation_memory.get(
-        session_id,
-        []
-    )
-
-    progress = learning_progress.get(
-        session_id,
-        []
-    )
-
-    if not history and not progress:
-
-        return question
-
-    history_text = ""
-
-    for item in history[-MAX_HISTORY:]:
-
-        history_text += (
-            f"User: {item.get('user', '')}\n"
-            f"Assistant: {item.get('assistant', '')}\n"
-        )
-
-    progress_text = json.dumps(
-        progress,
-        ensure_ascii=False
-    )
-
-    try:
-
-        response = client.chat.completions.create(
-
-            model="openai/gpt-oss-20b",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-Resolve the user's latest question using the
-conversation context and learning progress.
-
-Return ONLY the standalone rewritten question.
-
-Do not answer the question.
-Do not add explanations.
-"""
-                },
-                {
-                    "role": "user",
-                    "content": f"""
-Conversation history:
-
-{history_text}
-
-Learning progress:
-
-{progress_text}
-
-Latest question:
-
-{question}
-"""
-                }
-            ],
-
-            temperature=0
-        )
-
-        return response.choices[0].message.content.strip()
-
-    except Exception:
-
-        return question
-
-
-# ============================================================
 # Main Agent
 # ============================================================
 
@@ -742,127 +666,98 @@ def ask_agent(
     question: str,
     session_id: str = "default"
 ):
-    
-# --------------------------------------------------------
-# Direct Quiz Detection BEFORE Context Resolution
-# --------------------------------------------------------
 
-  direct_quiz_query = re.search(
-    r"\b("
-    r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-    r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-    r"create\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-    r"generate\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-    r"quiz\s+me"
-    r")\b",
-    question,
-    re.IGNORECASE
-)
+    # --------------------------------------------------------
+    # User Question
+    # --------------------------------------------------------
 
-if direct_quiz_query:
+    standalone_question = question
 
-    quiz_result = execute_quiz(question)
+    # --------------------------------------------------------
+    # Direct Quiz Detection
+    # --------------------------------------------------------
 
-    tool_trace = [
-        {
-            "step": 1,
-            "tool": "quiz_generator",
-            "status": (
-                "success"
-                if quiz_result["success"]
-                else "error"
-            ),
-            "arguments": json.dumps(
-                {
-                    "question": question
-                },
-                ensure_ascii=False
-            ),
-            "result": quiz_result.get(
-                "result",
-                ""
-            )
-        }
-    ]
-
-    answer = quiz_result.get(
-        "result",
-        ""
-    )
-
-    tool_trace.append(
-        {
-            "step": 2,
-            "tool": "final_response",
-            "status": "success",
-            "result": answer
-        }
-    )
-
-    conversation_memory.setdefault(
-        session_id,
-        []
-    )
-
-    conversation_memory[session_id].append(
-        {
-            "user": question,
-            "assistant": answer
-        }
-    )
-
-    conversation_memory[session_id] = (
-        conversation_memory[session_id][
-            -MAX_HISTORY:
-        ]
-    )
-
-    return {
-        "answer": answer,
-        "tool_trace": tool_trace,
-        "sources": []
-    }
-
-
-# --------------------------------------------------------
-# Resolve Context
-# --------------------------------------------------------
-
-direct_revision_query = re.search(
-    
-# --------------------------------------------------------
-# Resolve Context
-# --------------------------------------------------------
-
-    direct_revision_query = re.search(
+    direct_quiz_query = re.search(
         r"\b("
-        r"what should i revise|"
-        r"what should i study|"
-        r"what do i need to revise|"
-        r"what do i need to study|"
-        r"which topic should i revise|"
-        r"which topic should i study|"
-        r"what should i work on|"
-        r"where should i focus|"
-        r"what are my weak topics|"
-        r"show my weak topics|"
-        r"find my weak topics"
+        r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"create\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"generate\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"quiz\s+me"
         r")\b",
         question,
         re.IGNORECASE
     )
 
-    if direct_revision_query:
+    if direct_quiz_query:
 
-        standalone_question = question
-
-    else:
-
-        standalone_question = resolve_context(
-            question,
-            session_id
+        quiz_result = execute_quiz(
+            question
         )
-    
+
+        tool_trace = [
+            {
+                "step": 1,
+                "tool": "quiz_generator",
+                "status": (
+                    "success"
+                    if quiz_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question": question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": quiz_result.get(
+                    "result",
+                    ""
+                )
+            }
+        ]
+
+        answer = quiz_result.get(
+            "result",
+            ""
+        )
+
+        tool_trace.append(
+            {
+                "step": 2,
+                "tool": "final_response",
+                "status": "success",
+                "result": answer
+            }
+        )
+
+        # ----------------------------------------------------
+        # Save Conversation Memory
+        # ----------------------------------------------------
+
+        conversation_memory.setdefault(
+            session_id,
+            []
+        )
+
+        conversation_memory[session_id].append(
+            {
+                "user": question,
+                "assistant": answer
+            }
+        )
+
+        conversation_memory[session_id] = (
+            conversation_memory[session_id][
+                -MAX_HISTORY:
+            ]
+        )
+
+        return {
+            "answer": answer,
+            "tool_trace": tool_trace,
+            "sources": []
+        }
 
     # --------------------------------------------------------
     # Learning Progress Extraction
@@ -885,6 +780,7 @@ direct_revision_query = re.search(
         session_id,
         []
     )
+
     # ========================================================
     # Direct Weak Topic / Revision Detection
     # ========================================================
@@ -1071,99 +967,6 @@ Write a concise and useful revision recommendation.
             "tool_trace": tool_trace,
             "sources": []
         }
-    # ========================================================
-    # Direct Quiz Detection
-    # ========================================================
-
-    quiz_match = re.search(
-        r"\b("
-        r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-        r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-        r"create\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-        r"generate\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
-        r"quiz\s+me"
-        r")\b",
-        standalone_question,
-        re.IGNORECASE
-        )
-
-    if quiz_match:
-
-        quiz_result = execute_quiz(
-            standalone_question
-        )
-
-        tool_trace = [
-            {
-                "step": 1,
-                "tool": "quiz_generator",
-                "status": (
-                    "success"
-                    if quiz_result["success"]
-                    else "error"
-                ),
-                "arguments": json.dumps(
-                    {
-                        "question": standalone_question
-                    },
-                    ensure_ascii=False
-                ),
-                "result": quiz_result.get(
-                    "result",
-                    ""
-                )
-            }
-        ]
-
-        # ----------------------------------------------------
-        # Generate Final Quiz Response
-        # ----------------------------------------------------
-
-        answer = quiz_result.get(
-            "result",
-            ""
-        )
-
-        tool_trace.append(
-            {
-                "step": 2,
-                "tool": "final_response",
-                "status": "success",
-                "result": answer
-            }
-        )
-
-        # ----------------------------------------------------
-        # Save Conversation Memory
-        # ----------------------------------------------------
-
-        conversation_memory.setdefault(
-            session_id,
-            []
-        )
-
-        conversation_memory[session_id].append(
-            {
-                "user": question,
-                "assistant": answer
-            }
-        )
-
-        conversation_memory[session_id] = (
-            conversation_memory[session_id][
-                -MAX_HISTORY:
-            ]
-        )
-
-        return {
-            "answer": answer,
-            "tool_trace": tool_trace,
-            "sources": []
-        }
-
-    
-
-    
 
     # ========================================================
     # Direct Quiz Result Detection
@@ -1651,9 +1454,6 @@ Always choose the most relevant intent.
     # --------------------------------------------------------
     # Quiz Result Analyzer
     # --------------------------------------------------------
-    # Normally handled by Direct Quiz Result Detection.
-    # This fallback remains for router classification.
-    # --------------------------------------------------------
 
     if "quiz_result" in intents:
 
@@ -1842,7 +1642,7 @@ Write the final answer.
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-                }
+        }
                 
 
 
