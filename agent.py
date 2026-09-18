@@ -813,7 +813,7 @@ Always choose the most relevant intent.
 
             tools=router_tools,
 
-            tool_choice="required",
+            tool_choice="auto",
 
             temperature=0
         )
