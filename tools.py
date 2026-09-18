@@ -3,6 +3,7 @@ import json
 import re
 import serpapi
 from dotenv import load_dotenv
+from groq import Groq
 
 load_dotenv()
 client = Groq(
