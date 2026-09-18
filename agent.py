@@ -165,115 +165,196 @@ def execute_web_search(question: str):
             "result": f"Web search error: {str(e)}"
         }
 
-
-# ============================================================
-# Helper: Execute Quiz
-# ============================================================
-
 def execute_quiz(question: str):
 
-    try:
+    # --------------------------------------------------------
+    # Number of Questions
+    # --------------------------------------------------------
 
-        # ----------------------------------------------------
-        # Number of Questions
-        # ----------------------------------------------------
+    number_match = re.search(
+        r"(\d+)\s*[-]?\s*questions?",
+        question,
+        re.IGNORECASE
+    )
 
-        match = re.search(
-            r"(\d+)\s*[-]?\s*question",
-            question,
-            re.IGNORECASE
-        )
-
+    if number_match:
+        number_of_questions = int(number_match.group(1))
+    else:
         number_of_questions = 5
 
-        if match:
+    # Keep quiz size within allowed range
+    number_of_questions = max(
+        1,
+        min(number_of_questions, 20)
+    )
 
-            number_of_questions = int(
-                match.group(1)
-            )
+    # --------------------------------------------------------
+    # Difficulty
+    # --------------------------------------------------------
 
-        # ----------------------------------------------------
-        # Difficulty
-        # ----------------------------------------------------
+    if re.search(r"\bhard\b|\bdifficult\b|\badvanced\b", question, re.IGNORECASE):
+        difficulty = "hard"
 
+    elif re.search(r"\beasy\b|\bbasic\b", question, re.IGNORECASE):
+        difficulty = "easy"
+
+    else:
         difficulty = "medium"
 
+    # --------------------------------------------------------
+    # Subject
+    # --------------------------------------------------------
+
+    subjects = [
+        "biology",
+        "physics",
+        "chemistry",
+        "mathematics",
+        "math",
+        "computer",
+        "computer science",
+        "geography",
+        "history",
+        "civics",
+        "english",
+        "economics"
+    ]
+
+    subject = "General Studies"
+
+    for item in subjects:
         if re.search(
-            r"\beasy\b",
+            rf"\b{re.escape(item)}\b",
             question,
             re.IGNORECASE
         ):
+            subject = item
+            break
 
-            difficulty = "easy"
+    # Normalize subject names
+    subject_map = {
+        "biology": "Biology",
+        "physics": "Physics",
+        "chemistry": "Chemistry",
+        "mathematics": "Mathematics",
+        "math": "Mathematics",
+        "computer": "Computer Science",
+        "computer science": "Computer Science",
+        "geography": "Geography",
+        "history": "History",
+        "civics": "Civics",
+        "english": "English",
+        "economics": "Economics"
+    }
 
-        elif re.search(
-            r"\bhard\b",
-            question,
-            re.IGNORECASE
-        ):
+    subject = subject_map.get(
+        subject.lower(),
+        subject
+    )
 
-            difficulty = "hard"
+    # --------------------------------------------------------
+    # Topic
+    # --------------------------------------------------------
 
-        # ----------------------------------------------------
-        # Extract Subject
-        # ----------------------------------------------------
+    topic = subject
 
-        subject_match = re.search(
-            r"\b("
-            r"biology|physics|chemistry|"
-            r"mathematics|math|"
-            r"computer science|computer|"
-            r"history|geography|"
-            r"economics|civics"
-            r")\b",
-            question,
-            re.IGNORECASE
-        )
+    # Case 1:
+    # "quiz on Biology about Cell"
+    topic_match = re.search(
+        r"(?:on|about)\s+"
+        r"(?:biology|physics|chemistry|mathematics|math|"
+        r"computer\s+science|computer|geography|history|"
+        r"civics|english|economics)"
+        r"\s+(?:about|on)\s+"
+        r"(.+?)(?:\s+at|\s+with|\s*$)",
+        question,
+        re.IGNORECASE
+    )
 
-        subject = (
-            subject_match.group(1).strip()
-            if subject_match
-            else "General Studies"
-        )
+    if topic_match:
+        topic = topic_match.group(1).strip()
 
-        # ----------------------------------------------------
-        # Extract Topic
-        # ----------------------------------------------------
+    else:
 
+        # Case 2:
+        # "quiz about Cell"
         topic_match = re.search(
-            r"(?:on|about)\s+(.+?)(?:\s+at|\s+with|\s*$)",
+            r"(?:about|on)\s+"
+            r"(.+?)(?:\s+at|\s+with|\s*$)",
             question,
             re.IGNORECASE
         )
 
-        topic = (
-            topic_match.group(1).strip()
-            if topic_match
-            else "general"
-        )
+        if topic_match:
 
-        # ----------------------------------------------------
-        # Generate Quiz
-        # ----------------------------------------------------
+            extracted_topic = topic_match.group(1).strip()
 
-        result = quiz_generator(
-            subject=subject,
-            topic=topic,
-            number_of_questions=number_of_questions,
-            difficulty=difficulty
-        )
+            # If extracted topic starts with the subject,
+            # remove the subject from it.
+            subject_pattern = re.escape(subject)
 
-        return {
-            "success": True,
-            "result": result
-        }
+            extracted_topic = re.sub(
+                rf"^{subject_pattern}\s+(?:about|on)\s+",
+                "",
+                extracted_topic,
+                flags=re.IGNORECASE
+            ).strip()
 
-    except Exception as e:
+            if extracted_topic:
+                topic = extracted_topic
 
-        return {
-            "success": False,
-            "result": f"Quiz generation error: {str(e)}"
-        }
+    # --------------------------------------------------------
+    # Clean Topic
+    # --------------------------------------------------------
+
+    topic = topic.strip(" .,?!")
+
+    if not topic:
+        topic = subject
+
+    # --------------------------------------------------------
+    # Call Quiz Generator
+    # --------------------------------------------------------
+
+    result = quiz_generator(
+        subject=subject,
+        topic=topic,
+        number_of_questions=number_of_questions,
+        difficulty=difficulty
+    )
+
+    # --------------------------------------------------------
+    # Return Result
+    # --------------------------------------------------------
+
+    return {
+        "subject": subject,
+        "topic": topic,
+        "number_of_questions": number_of_questions,
+        "difficulty": difficulty,
+        "instruction": (
+            f"Generate {number_of_questions} "
+            f"{difficulty}-difficulty questions "
+            f"on {topic} in {subject}."
+        ),
+        "result": result
+    }
+
+
+
+
+
+
+
+
+
+    
+
+        
+            
+
+        
+        
 
 
 # ============================================================
