@@ -744,6 +744,93 @@ def ask_agent(
 ):
     
 # --------------------------------------------------------
+# Direct Quiz Detection BEFORE Context Resolution
+# --------------------------------------------------------
+
+direct_quiz_query = re.search(
+    r"\b("
+    r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+    r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+    r"create\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+    r"generate\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+    r"quiz\s+me"
+    r")\b",
+    question,
+    re.IGNORECASE
+)
+
+if direct_quiz_query:
+
+    quiz_result = execute_quiz(question)
+
+    tool_trace = [
+        {
+            "step": 1,
+            "tool": "quiz_generator",
+            "status": (
+                "success"
+                if quiz_result["success"]
+                else "error"
+            ),
+            "arguments": json.dumps(
+                {
+                    "question": question
+                },
+                ensure_ascii=False
+            ),
+            "result": quiz_result.get(
+                "result",
+                ""
+            )
+        }
+    ]
+
+    answer = quiz_result.get(
+        "result",
+        ""
+    )
+
+    tool_trace.append(
+        {
+            "step": 2,
+            "tool": "final_response",
+            "status": "success",
+            "result": answer
+        }
+    )
+
+    conversation_memory.setdefault(
+        session_id,
+        []
+    )
+
+    conversation_memory[session_id].append(
+        {
+            "user": question,
+            "assistant": answer
+        }
+    )
+
+    conversation_memory[session_id] = (
+        conversation_memory[session_id][
+            -MAX_HISTORY:
+        ]
+    )
+
+    return {
+        "answer": answer,
+        "tool_trace": tool_trace,
+        "sources": []
+    }
+
+
+# --------------------------------------------------------
+# Resolve Context
+# --------------------------------------------------------
+
+direct_revision_query = re.search(
+    
+# --------------------------------------------------------
 # Resolve Context
 # --------------------------------------------------------
 
