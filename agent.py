@@ -742,6 +742,194 @@ def ask_agent(
         session_id,
         []
     )
+    # ========================================================
+    # Direct Weak Topic / Revision Detection
+    # ========================================================
+
+    weak_topic_match = re.search(
+        r"\b("
+        r"what should i revise|"
+        r"what should i study|"
+        r"what do i need to revise|"
+        r"what do i need to study|"
+        r"which topic should i revise|"
+        r"which topic should i study|"
+        r"what should i work on|"
+        r"where should i focus|"
+        r"what are my weak topics|"
+        r"show my weak topics|"
+        r"find my weak topics"
+        r")\b",
+        standalone_question,
+        re.IGNORECASE
+    )
+
+    if weak_topic_match:
+
+        weak_topics_result = weak_topic_detector(
+            progress
+        )
+
+        revision_result = generate_targeted_revision(
+            progress
+        )
+
+        tool_trace = []
+
+        # ----------------------------------------------------
+        # Weak Topic Detector Trace
+        # ----------------------------------------------------
+
+        tool_trace.append(
+            {
+                "step": 1,
+                "tool": "weak_topic_detector",
+                "status": "success",
+                "arguments": json.dumps(
+                    {
+                        "progress_items": len(progress)
+                    },
+                    ensure_ascii=False
+                ),
+                "result": weak_topics_result
+            }
+        )
+
+        # ----------------------------------------------------
+        # Targeted Revision Trace
+        # ----------------------------------------------------
+
+        tool_trace.append(
+            {
+                "step": 2,
+                "tool": "targeted_revision",
+                "status": (
+                    "success"
+                    if revision_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "progress_items": len(progress)
+                    },
+                    ensure_ascii=False
+                ),
+                "result": revision_result.get(
+                    "result",
+                    ""
+                )
+            }
+        )
+
+        # ----------------------------------------------------
+        # Generate Student-Friendly Answer
+        # ----------------------------------------------------
+
+        try:
+
+            final_response = client.chat.completions.create(
+
+                model="openai/gpt-oss-20b",
+
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """
+You are EduAgent AI.
+
+Use the learning progress and revision results
+to give the user a clear, student-friendly answer.
+
+Identify the weak topic from the available data.
+
+Give a practical revision recommendation.
+
+Do not mention tools, routing, internal architecture,
+or implementation details.
+"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""
+User question:
+
+{standalone_question}
+
+Learning progress:
+
+{json.dumps(progress, ensure_ascii=False)}
+
+Weak topic result:
+
+{weak_topics_result}
+
+Targeted revision:
+
+{revision_result.get("result", "")}
+
+Write a concise and useful revision recommendation.
+"""
+                    }
+                ],
+
+                temperature=0.2
+            )
+
+            answer = (
+                final_response
+                .choices[0]
+                .message
+                .content
+            )
+
+        except Exception as e:
+
+            answer = (
+                f"Revision response error: {str(e)}"
+            )
+
+        # ----------------------------------------------------
+        # Final Response Trace
+        # ----------------------------------------------------
+
+        tool_trace.append(
+            {
+                "step": 3,
+                "tool": "final_response",
+                "status": "success",
+                "result": answer
+            }
+        )
+
+        # ----------------------------------------------------
+        # Save Conversation Memory
+        # ----------------------------------------------------
+
+        conversation_memory.setdefault(
+            session_id,
+            []
+        )
+
+        conversation_memory[session_id].append(
+            {
+                "user": question,
+                "assistant": answer
+            }
+        )
+
+        conversation_memory[session_id] = (
+            conversation_memory[session_id][
+                -MAX_HISTORY:
+            ]
+        )
+
+        return {
+            "answer": answer,
+            "tool_trace": tool_trace,
+            "sources": []
+        }
+
+    
 
     # ========================================================
     # Direct Quiz Result Detection
