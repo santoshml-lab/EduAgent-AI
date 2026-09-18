@@ -958,19 +958,17 @@ Write a concise and useful revision recommendation.
     # Direct Quiz Detection
     # ========================================================
 
-    quiz_match = re.search(
+     quiz_match = re.search(
         r"\b("
-        r"give me a quiz|"
-        r"make me a quiz|"
-        r"create a quiz|"
-        r"generate a quiz|"
-        r"quiz me|"
-        r"take a quiz|"
-        r"test me"
+        r"give\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"make\s+(?:me\s+)?(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"create\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"generate\s+(?:a\s+)?(?:\d+\s+)?questions?\s+quiz|"
+        r"quiz\s+me"
         r")\b",
         standalone_question,
         re.IGNORECASE
-    )
+        )
 
     if quiz_match:
 
