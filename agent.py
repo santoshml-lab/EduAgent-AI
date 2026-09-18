@@ -1,20 +1,20 @@
-from groq import Groq
 import os
 import json
 import re
+
 from dotenv import load_dotenv
+from groq import Groq
 
 from tools import (
+    TOOLS,
     calculator,
     web_search,
     education_router,
     quiz_generator,
     study_plan_generator,
     weak_topic_detector,
-    quiz_result_analyzer,
-    TOOLS
+    quiz_result_analyzer
 )
-
 
 load_dotenv()
 
@@ -47,95 +47,35 @@ MAX_PROGRESS_ITEMS = 20
 
 def extract_calculation(question: str):
 
-    text = question.lower().strip()
+    patterns = [
+        r"what is (.+?)(?:\?|$)",
+        r"calculate (.+?)(?:\?|$)",
+        r"solve (.+?)(?:\?|$)",
+        r"find (.+?)(?:\?|$)"
+    ]
 
-    percentage_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s*(?:of)\s*"
-        r"(\d+(?:\.\d+)?)",
-        text
-    )
+    for pattern in patterns:
 
-    if percentage_match:
-
-        percentage = float(percentage_match.group(1))
-        number = float(percentage_match.group(2))
-
-        return f"({percentage} / 100) * {number}"
-
-    reverse_percentage_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*"
-        r"(?:students?|people|persons?|children|items?|"
-        r"candidates?|employees?|customers?|members?)?"
-        r".{0,80}?"
-        r"(\d+(?:\.\d+)?)\s*(?:%|percent)",
-        text
-    )
-
-    if reverse_percentage_match:
-
-        number = float(
-            reverse_percentage_match.group(1)
+        match = re.search(
+            pattern,
+            question,
+            re.IGNORECASE
         )
 
-        percentage = float(
-            reverse_percentage_match.group(2)
-        )
+        if match:
 
-        if percentage <= 100:
+            expression = match.group(1).strip()
 
-            return (
-                f"({percentage} / 100) * {number}"
+            expression = re.sub(
+                r"\b(of|students|people|items|units)\b.*$",
+                "",
+                expression,
+                flags=re.IGNORECASE
             )
 
-    out_of_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*(?:%|percent)"
-        r".{0,30}?"
-        r"(?:out of|from|among)\s*"
-        r"(\d+(?:\.\d+)?)",
-        text
-    )
-
-    if out_of_match:
-
-        percentage = float(
-            out_of_match.group(1)
-        )
-
-        number = float(
-            out_of_match.group(2)
-        )
-
-        return (
-            f"({percentage} / 100) * {number}"
-        )
-
-    arithmetic_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*"
-        r"([\+\-\*\/])\s*"
-        r"(\d+(?:\.\d+)?)",
-        text
-    )
-
-    if arithmetic_match:
-
-        number1 = arithmetic_match.group(1)
-        operator = arithmetic_match.group(2)
-        number2 = arithmetic_match.group(3)
-
-        return (
-            f"{number1} {operator} {number2}"
-        )
+            return expression.strip()
 
     return None
-
-
-# ============================================================
-# Helper: Extract Web Query
-# ============================================================
-
-def extract_web_query(question: str):
-
-    return question.strip()
 
 
 # ============================================================
@@ -144,25 +84,25 @@ def extract_web_query(question: str):
 
 def execute_calculator(question: str):
 
-    expression = extract_calculation(question)
+    expression = extract_calculation(
+        question
+    )
 
     if not expression:
 
         return {
             "success": False,
-            "result": (
-                "Calculator could not identify a mathematical "
-                "expression from the question."
-            )
+            "result": "Could not extract calculation."
         }
 
     try:
 
-        result = calculator(expression)
+        result = calculator(
+            expression
+        )
 
         return {
             "success": True,
-            "expression": expression,
             "result": result
         }
 
@@ -170,9 +110,27 @@ def execute_calculator(question: str):
 
         return {
             "success": False,
-            "expression": expression,
             "result": f"Calculator error: {str(e)}"
         }
+
+
+# ============================================================
+# Helper: Extract Web Query
+# ============================================================
+
+def extract_web_query(question: str):
+
+    match = re.search(
+        r"(?:latest|recent|current|today|news about|information about)\s+(.+)",
+        question,
+        re.IGNORECASE
+    )
+
+    if match:
+
+        return match.group(1).strip()
+
+    return question
 
 
 # ============================================================
@@ -181,15 +139,18 @@ def execute_calculator(question: str):
 
 def execute_web_search(question: str):
 
-    query = extract_web_query(question)
+    query = extract_web_query(
+        question
+    )
 
     try:
 
-        result = web_search(query)
+        result = web_search(
+            query
+        )
 
         return {
             "success": True,
-            "query": query,
             "result": result
         }
 
@@ -197,75 +158,63 @@ def execute_web_search(question: str):
 
         return {
             "success": False,
-            "query": query,
             "result": f"Web search error: {str(e)}"
         }
 
 
 # ============================================================
-# Helper: Execute Quiz Generator
+# Helper: Execute Quiz
 # ============================================================
 
 def execute_quiz(question: str):
 
-    extraction_prompt = [
-        {
-            "role": "system",
-            "content": (
-                "Extract quiz parameters from the user's request. "
-                "Return ONLY valid JSON with these keys: "
-                "subject, topic, number_of_questions, difficulty. "
-                "number_of_questions must be an integer between 1 and 20. "
-                "difficulty must be easy, medium, or hard. "
-                "If not specified, use 10 and medium."
-            )
-        },
-        {
-            "role": "user",
-            "content": question
-        }
-    ]
-
     try:
 
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=extraction_prompt,
-            temperature=0
+        match = re.search(
+            r"(\d+)\s*[-]?\s*question",
+            question,
+            re.IGNORECASE
         )
 
-        content = response.choices[0].message.content or "{}"
+        number_of_questions = 5
 
-        content = content.replace("```json", "")
-        content = content.replace("```", "")
-        content = content.strip()
+        if match:
 
-        params = json.loads(content)
-
-        subject = params.get(
-            "subject",
-            "General"
-        )
-
-        topic = params.get(
-            "topic",
-            "General"
-        )
-
-        number_of_questions = int(
-            params.get(
-                "number_of_questions",
-                10
+            number_of_questions = int(
+                match.group(1)
             )
+
+        difficulty = "medium"
+
+        if re.search(
+            r"\beasy\b",
+            question,
+            re.IGNORECASE
+        ):
+
+            difficulty = "easy"
+
+        elif re.search(
+            r"\bhard\b",
+            question,
+            re.IGNORECASE
+        ):
+
+            difficulty = "hard"
+
+        topic_match = re.search(
+            r"(?:on|about)\s+(.+?)(?:\s+at|\s+with|\s*$)",
+            question,
+            re.IGNORECASE
         )
 
-        difficulty = params.get(
-            "difficulty",
-            "medium"
+        topic = (
+            topic_match.group(1).strip()
+            if topic_match
+            else "general"
         )
 
         result = quiz_generator(
-            subject=subject,
             topic=topic,
             number_of_questions=number_of_questions,
             difficulty=difficulty
@@ -280,7 +229,7 @@ def execute_quiz(question: str):
 
         return {
             "success": False,
-            "result": f"Quiz generator error: {str(e)}"
+            "result": f"Quiz generation error: {str(e)}"
         }
 
 
@@ -290,69 +239,48 @@ def execute_quiz(question: str):
 
 def execute_study_plan(question: str):
 
-    extraction_prompt = [
-        {
-            "role": "system",
-            "content": (
-                "Extract study-plan parameters from the user's request. "
-                "Return ONLY valid JSON with these keys: "
-                "subject, days, hours_per_day, topics. "
-                "days must be an integer. "
-                "hours_per_day must be a number. "
-                "If topics are not specified, use an empty string."
-            )
-        },
-        {
-            "role": "user",
-            "content": question
-        }
-    ]
-
     try:
 
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=extraction_prompt,
-            temperature=0
+        days_match = re.search(
+            r"(\d+)\s*[-]?\s*day",
+            question,
+            re.IGNORECASE
         )
 
-        content = response.choices[0].message.content or "{}"
-
-        content = content.replace("```json", "")
-        content = content.replace("```", "")
-        content = content.strip()
-
-        params = json.loads(content)
-
-        subject = params.get(
-            "subject",
-            "General"
+        hours_match = re.search(
+            r"(\d+(?:\.\d+)?)\s*hours?",
+            question,
+            re.IGNORECASE
         )
 
-        days = int(
-            params.get(
-                "days",
-                7
-            )
+        days = (
+            int(days_match.group(1))
+            if days_match
+            else 7
         )
 
-        hours_per_day = float(
-            params.get(
-                "hours_per_day",
-                2
-            )
+        hours_per_day = (
+            float(hours_match.group(1))
+            if hours_match
+            else 2
         )
 
-        topics = params.get(
-            "topics",
-            ""
+        subject_match = re.search(
+            r"(?:for|of)\s+(?:Class\s+\d+\s+)?(.+?)(?:\s+with|\s+for|\s*$)",
+            question,
+            re.IGNORECASE
+        )
+
+        subject = (
+            subject_match.group(1).strip()
+            if subject_match
+            else "General Studies"
         )
 
         result = study_plan_generator(
             subject=subject,
             days=days,
-            hours_per_day=hours_per_day,
-            topics=topics
+            hours_per_day=hours_per_day
         )
 
         return {
@@ -364,7 +292,7 @@ def execute_study_plan(question: str):
 
         return {
             "success": False,
-            "result": f"Study plan generator error: {str(e)}"
+            "result": f"Study plan error: {str(e)}"
         }
 
 
@@ -372,77 +300,69 @@ def execute_study_plan(question: str):
 # Helper: Extract Learning Progress
 # ============================================================
 
-def extract_learning_progress(question: str):
-
-    extraction_prompt = [
-        {
-            "role": "system",
-            "content": (
-                "You extract ONLY explicit learning-performance "
-                "information from a user's education-related message.\n\n"
-
-                "Return ONLY valid JSON with these keys:\n"
-                "subject, topic, score, score_type, note\n\n"
-
-                "Rules:\n"
-                "1. Only record information explicitly stated by the user.\n"
-                "2. Do not guess or infer a score.\n"
-                "3. score must be a number or null.\n"
-                "4. score_type can be percentage, marks, or null.\n"
-                "5. subject and topic can be empty strings if not stated.\n"
-                "6. note should contain a short explicit performance note.\n"
-                "7. If there is no learning-performance information, "
-                "return score as null and note as an empty string.\n\n"
-
-                "Example:\n"
-                "User: I scored 60% in my photosynthesis quiz.\n"
-                "JSON: {\n"
-                "  \"subject\": \"\",\n"
-                "  \"topic\": \"photosynthesis\",\n"
-                "  \"score\": 60,\n"
-                "  \"score_type\": \"percentage\",\n"
-                "  \"note\": \"Scored 60% in a photosynthesis quiz.\"\n"
-                "}"
-            )
-        },
-        {
-            "role": "user",
-            "content": question
-        }
-    ]
+def extract_learning_progress(
+    question: str
+):
 
     try:
 
         response = client.chat.completions.create(
+
             model="openai/gpt-oss-20b",
-            messages=extraction_prompt,
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+Extract learning progress from the user's message.
+
+Return ONLY valid JSON.
+
+Schema:
+
+{
+  "subject": "",
+  "topic": "",
+  "score": null,
+  "score_type": "percentage",
+  "note": ""
+}
+
+If the user did not provide a score,
+return score as null.
+
+Do not invent a score.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ],
+
             temperature=0
         )
 
-        content = response.choices[0].message.content or "{}"
+        content = response.choices[0].message.content
 
-        content = content.replace("```json", "")
-        content = content.replace("```", "")
         content = content.strip()
 
-        data = json.loads(content)
+        content = re.sub(
+            r"^```json\s*",
+            "",
+            content,
+            flags=re.IGNORECASE
+        )
 
-        score = data.get("score")
+        content = re.sub(
+            r"\s*```$",
+            "",
+            content
+        )
 
-        if score is not None:
-
-            try:
-                score = float(score)
-            except Exception:
-                score = None
-
-        return {
-            "subject": data.get("subject", ""),
-            "topic": data.get("topic", ""),
-            "score": score,
-            "score_type": data.get("score_type"),
-            "note": data.get("note", "")
-        }
+        return json.loads(
+            content
+        )
 
     except Exception:
 
@@ -450,9 +370,10 @@ def extract_learning_progress(question: str):
             "subject": "",
             "topic": "",
             "score": None,
-            "score_type": None,
+            "score_type": "percentage",
             "note": ""
         }
+
 
 # ============================================================
 # Helper: Save Learning Progress
@@ -464,6 +385,7 @@ def save_learning_progress(
 ):
 
     if progress.get("score") is None:
+
         return
 
     learning_progress.setdefault(
@@ -506,10 +428,6 @@ def save_learning_progress(
 
     updated = False
 
-    # --------------------------------------------------------
-    # Update existing topic record
-    # --------------------------------------------------------
-
     for index, old_record in enumerate(
         learning_progress[session_id]
     ):
@@ -546,19 +464,11 @@ def save_learning_progress(
 
             break
 
-    # --------------------------------------------------------
-    # Add new topic record
-    # --------------------------------------------------------
-
     if not updated:
 
         learning_progress[session_id].append(
             new_record
         )
-
-    # --------------------------------------------------------
-    # Keep memory within limit
-    # --------------------------------------------------------
 
     learning_progress[session_id] = (
         learning_progress[session_id][
@@ -567,126 +477,15 @@ def save_learning_progress(
     )
 
 
-
-        
-            
-
-
 # ============================================================
-# Helper: Resolve Conversation Context
+# Helper: Execute Quiz Result
 # ============================================================
 
-def resolve_context(
-    question: str,
-    history: list,
-    progress: list
+def execute_quiz_result(
+    question: str
 ):
 
-    if not history and not progress:
-        return question
-
-    history_text = "\n".join(
-        [
-            f"User: {item['question']}\n"
-            f"Assistant: {item['answer']}"
-            for item in history[-MAX_HISTORY:]
-        ]
-    )
-
-    progress_text = json.dumps(
-        progress[-MAX_PROGRESS_ITEMS:],
-        ensure_ascii=False,
-        indent=2
-    )
-
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a conversation context resolver for "
-                "an education AI agent.\n\n"
-
-                "Your job is to convert the CURRENT user question "
-                "into a standalone question when it depends on "
-                "previous conversation or explicitly stored learning "
-                "progress.\n\n"
-
-                "Rules:\n"
-                "1. Use previous conversation only when necessary.\n"
-                "2. Use learning progress only when it is relevant.\n"
-                "3. Resolve words like it, this, that, these, those, "
-                "same subject, continue, change, modify, add, remove, "
-                "make it easier, make it harder, etc.\n"
-                "4. Preserve the user's actual requested change.\n"
-                "5. If the current question is already standalone, "
-                "return it unchanged.\n"
-                "6. Do not invent learning scores or progress.\n"
-                "7. Do not answer the question.\n"
-                "8. Return ONLY the resolved standalone question.\n\n"
-
-                "Example:\n"
-                "Previous: User created a Biology study plan.\n"
-                "Current: Make it 2 hours per day.\n"
-                "Resolved: Change the Biology study plan to 2 hours "
-                "per day.\n\n"
-
-                "Learning progress example:\n"
-                "Stored progress: User scored 60% in photosynthesis.\n"
-                "Current: What should I revise next?\n"
-                "Resolved: Based on my Biology learning progress, "
-                "what should I revise next, considering my photosynthesis "
-                "quiz score?"
-            )
-        },
-        {
-            "role": "user",
-            "content": (
-                "Previous conversation:\n\n"
-                f"{history_text}\n\n"
-
-                "Stored learning progress:\n\n"
-                f"{progress_text}\n\n"
-
-                "Current user question:\n"
-                f"{question}"
-            )
-        }
-    ]
-
     try:
-
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=messages,
-            temperature=0
-        )
-
-        resolved = (
-            response.choices[0].message.content
-            or question
-        )
-
-        resolved = resolved.strip()
-
-        return (
-            resolved
-            if resolved
-            else question
-        )
-
-    except Exception:
-
-        return question
-
-def execute_quiz_result(question: str):
-
-    try:
-
-        # ----------------------------------------------------
-        # Extract percentage score
-        # Example:
-        # "I scored 80% in my photosynthesis quiz."
-        # ----------------------------------------------------
 
         score_match = re.search(
             r"(\d+(?:\.\d+)?)\s*%",
@@ -707,10 +506,6 @@ def execute_quiz_result(question: str):
             score_match.group(1)
         )
 
-        # ----------------------------------------------------
-        # Extract topic
-        # ----------------------------------------------------
-
         topic = ""
 
         topic_match = re.search(
@@ -723,19 +518,11 @@ def execute_quiz_result(question: str):
 
             topic = topic_match.group(1).strip()
 
-        # ----------------------------------------------------
-        # Clean topic
-        # ----------------------------------------------------
-
         topic = re.sub(
             r"\s+",
             " ",
             topic
         )
-
-        # ----------------------------------------------------
-        # Run existing analyzer
-        # ----------------------------------------------------
 
         result = quiz_result_analyzer(
             subject="",
@@ -759,6 +546,7 @@ def execute_quiz_result(question: str):
                 f"Quiz result analyzer error: {str(e)}"
             )
         }
+
 
 # ============================================================
 # Helper: Generate Targeted Revision
@@ -827,67 +615,14 @@ def generate_targeted_revision(
     }
 
 
-
-    
-
-        
-            
-
-            
-                
-                    
-            
-
-
-
-
-
-
-
-    
-
-        
-
-        
-
-
-
-
-
-                
-        
-                
-            
-
-
 # ============================================================
-# Main Agent
+# Helper: Resolve Context
 # ============================================================
 
-def ask_agent(
+def resolve_context(
     question: str,
-    session_id: str = "default"
+    session_id: str
 ):
-
-    question = question.strip()
-
-    session_id = (
-        session_id.strip()
-        if session_id
-        else "default"
-    )
-
-    if not question:
-
-        return {
-            "answer": "Please enter a question.",
-            "tool_trace": [],
-            "sources": []
-        }
-
-    # ========================================================
-    # STEP 0 — LOAD MEMORY
-    # ========================================================
 
     history = conversation_memory.get(
         session_id,
@@ -899,243 +634,227 @@ def ask_agent(
         []
     )
 
-    # ========================================================
-    # STEP 0.5 — EXTRACT LEARNING PROGRESS
-    # ========================================================
+    if not history and not progress:
 
-    progress_data = extract_learning_progress(
+        return question
+
+    history_text = ""
+
+    for item in history[-MAX_HISTORY:]:
+
+        history_text += (
+            f"User: {item.get('user', '')}\n"
+            f"Assistant: {item.get('assistant', '')}\n"
+        )
+
+    progress_text = json.dumps(
+        progress,
+        ensure_ascii=False
+    )
+
+    try:
+
+        response = client.chat.completions.create(
+
+            model="openai/gpt-oss-20b",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+Resolve the user's latest question using the
+conversation context and learning progress.
+
+Return ONLY the standalone rewritten question.
+
+Do not answer the question.
+Do not add explanations.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+Conversation history:
+
+{history_text}
+
+Learning progress:
+
+{progress_text}
+
+Latest question:
+
+{question}
+"""
+                }
+            ],
+
+            temperature=0
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception:
+
+        return question
+
+
+# ============================================================
+# Main Agent
+# ============================================================
+
+def ask_agent(
+    question: str,
+    session_id: str = "default"
+):
+
+    # --------------------------------------------------------
+    # Resolve Context
+    # --------------------------------------------------------
+
+    standalone_question = resolve_context(
+        question,
+        session_id
+    )
+
+    # --------------------------------------------------------
+    # Learning Progress Extraction
+    # --------------------------------------------------------
+
+    progress_update = extract_learning_progress(
         question
     )
 
     save_learning_progress(
         session_id,
-        progress_data
+        progress_update
     )
+
+    # --------------------------------------------------------
+    # Current Progress
+    # --------------------------------------------------------
 
     progress = learning_progress.get(
         session_id,
         []
     )
 
-    print(
-        "DEBUG LEARNING PROGRESS:",
-        progress
-    )
-
-    print(
-        "DEBUG SESSION ID:",
-        session_id
-    )
-
-    # ========================================================
-    # STEP 0.6 — RESOLVE CONTEXT
-    # ========================================================
-
-    contextual_question = resolve_context(
-        question,
-        history,
-        progress
-    )
-
-    tool_trace = []
-    web_sources = []
-
-    # ========================================================
-    # STEP 1 — EDUCATION ROUTER
-    # ========================================================
-
-    router_trace = {
-        "step": 1,
-        "tool": "education_router",
-        "status": "running",
-        "arguments": json.dumps(
-            {
-                "intents": []
-            }
-        )
-    }
-
-    tool_trace.append(router_trace)
+    # --------------------------------------------------------
+    # Router
+    # --------------------------------------------------------
 
     router_messages = [
+
         {
             "role": "system",
-            "content": (
-                "You are the education task router for EduAgent AI.\n\n"
+            "content": """
+You are the intent router for an educational AI agent.
 
-                "Your ONLY job is to identify ALL applicable "
-                "education intents in the user's question.\n\n"
+Classify the user's request into one or more of these intents:
 
-                "Available intents:\n"
-                "- explanation\n"
-                "- numerical\n"
-                "- quiz\n"
-                "- study_plan\n"
-                "- current_information\n"
-                "- weak_topic\n"
-                "- quiz_result\n\n"
+1. explanation
+2. numerical
+3. quiz
+4. study_plan
+5. current_information
+6. weak_topic
+7. quiz_result
 
-                "IMPORTANT ROUTING RULES:\n\n"
+Important priority:
 
-                "QUIZ RESULT RULE:\n"
-                "If the user explicitly reports a quiz or test score, "
-                "such as 'I scored 80%', 'I got 65%', "
-                "'I scored 8 out of 10', or similar performance "
-                "information, use quiz_result.\n\n"
+- quiz_result → when the user reports a quiz score
+- weak_topic → when the user asks what to revise next or asks about weak topics
+- study_plan → when the user requests a study plan
+- quiz → when the user requests a quiz
+- numerical → when calculation is required
+- current_information → when latest/current/recent information is needed
+- explanation → normal educational explanation
 
-                "If the user reports a score and asks to analyze, "
-                "interpret, classify, evaluate, or understand "
-                "their performance, use quiz_result.\n\n"
+Use the available tools when appropriate.
 
-                "A quiz score must route to quiz_result regardless "
-                "of whether the score is high, medium, or low.\n\n"
-
-                "Do NOT use weak_topic merely because a score is "
-                "mentioned.\n\n"
-
-                "WEAK TOPIC RULE:\n"
-                "Use weak_topic when the user asks about weak areas, "
-                "what topic needs revision, what should be revised "
-                "next, or which learning topics need more revision "
-                "based on stored learning performance.\n\n"
-
-                "STUDY PLAN RULE:\n"
-                "Use study_plan when the user explicitly asks for "
-                "a study schedule or study plan.\n\n"
-
-                "QUIZ GENERATOR RULE:\n"
-                "Use quiz when the user asks to create or generate "
-                "a quiz, test, MCQs, or practice questions.\n\n"
-
-                "EXPLANATION RULE:\n"
-                "Use explanation when the user asks to explain or "
-                "learn an educational concept.\n\n"
-
-                "NUMERICAL RULE:\n"
-                "Use numerical when the user asks to calculate or "
-                "solve a mathematical/numerical problem.\n\n"
-
-                "CURRENT INFORMATION RULE:\n"
-                "Use current_information when the user asks for "
-                "latest, current, recent, today's, or otherwise "
-                "time-sensitive information.\n\n"
-
-                "MULTIPLE INTENTS:\n"
-                "If multiple tasks exist, return ALL applicable intents.\n\n"
-
-                "PRIORITY:\n"
-                "1. Explicit quiz/test score + performance analysis "
-                "-> quiz_result\n"
-                "2. Weak-topic/revision request based on stored progress "
-                "-> weak_topic\n"
-                "3. Explicit study schedule request -> study_plan\n"
-                "4. Quiz creation request -> quiz\n"
-                "5. Numerical calculation -> numerical\n"
-                "6. Current/latest information -> current_information\n"
-                "7. Concept learning/explanation -> explanation\n\n"
-
-                "Do not answer the user's question."
-            )
+Always choose the most relevant intent.
+"""
         },
+
         {
             "role": "user",
-            "content": contextual_question
+            "content": standalone_question
         }
+
     ]
 
     try:
 
         router_response = client.chat.completions.create(
+
             model="openai/gpt-oss-20b",
+
             messages=router_messages,
+
             tools=TOOLS,
+
             tool_choice="required",
+
             temperature=0
         )
 
     except Exception as e:
 
-        tool_trace[-1]["status"] = "error"
-
         return {
-            "answer": (
-                "EduAgent AI could not run the education router. "
-                f"Error: {str(e)}"
-            ),
-            "tool_trace": tool_trace,
+            "answer": f"Router error: {str(e)}",
+            "tool_trace": [],
             "sources": []
         }
 
-    router_message = (
-        router_response.choices[0].message
+    # --------------------------------------------------------
+    # Read Router Tool Calls
+    # --------------------------------------------------------
+
+    tool_calls = (
+        router_response
+        .choices[0]
+        .message
+        .tool_calls
     )
 
     intents = []
 
-    if router_message.tool_calls:
+    if tool_calls:
 
-        router_call = (
-            router_message.tool_calls[0]
-        )
+        for tool_call in tool_calls:
 
-        try:
+            try:
 
-            router_arguments = json.loads(
-                router_call.function.arguments
+                arguments = json.loads(
+                    tool_call.function.arguments
+                )
+
+            except Exception:
+
+                arguments = {}
+
+            intent = arguments.get(
+                "intent"
             )
 
-            intents = router_arguments.get(
-                "intents",
-                []
-            )
+            if intent:
 
-        except Exception as e:
+                intents.append(
+                    intent
+                )
 
-            tool_trace[-1]["status"] = "error"
+    # --------------------------------------------------------
+    # Tool Execution
+    # --------------------------------------------------------
 
-            return {
-                "answer": (
-                    "Education router returned invalid arguments. "
-                    f"Error: {str(e)}"
-                ),
-                "tool_trace": tool_trace,
-                "sources": []
-            }
-
-    else:
-
-        tool_trace[-1]["status"] = "error"
-
-        return {
-            "answer": (
-                "Education router did not return "
-                "a valid routing result."
-            ),
-            "tool_trace": tool_trace,
-            "sources": []
-        }
-
-    intents = list(
-        dict.fromkeys(intents)
-    )
-
-    tool_trace[-1]["arguments"] = json.dumps(
-        {
-            "intents": intents
-        },
-        ensure_ascii=False
-    )
-
-    tool_trace[-1]["status"] = "success"
-
-    # ========================================================
-    # STEP 2 — DETERMINISTIC TOOL EXECUTION
-    # ========================================================
+    tool_trace = []
 
     tool_results = []
 
+    web_sources = []
+
     # --------------------------------------------------------
-    # Calculator
+    # Numerical
     # --------------------------------------------------------
 
     if "numerical" in intents:
@@ -1144,40 +863,42 @@ def ask_agent(
             "step": len(tool_trace) + 1,
             "tool": "calculator",
             "status": "running",
-            "arguments": "{}"
+            "arguments": json.dumps(
+                {
+                    "question": standalone_question
+                },
+                ensure_ascii=False
+            )
         }
 
-        tool_trace.append(trace)
-
-        calculation_result = execute_calculator(
-            contextual_question
+        tool_trace.append(
+            trace
         )
 
-        trace["arguments"] = json.dumps(
-            {
-                "expression": calculation_result.get(
-                    "expression",
-                    ""
-                )
-            },
-            ensure_ascii=False
+        calculator_result = execute_calculator(
+            standalone_question
         )
 
         trace["status"] = (
             "success"
-            if calculation_result["success"]
+            if calculator_result["success"]
             else "error"
+        )
+
+        trace["result"] = calculator_result.get(
+            "result",
+            ""
         )
 
         tool_results.append(
             {
                 "tool": "calculator",
-                "data": calculation_result
+                "data": calculator_result
             }
         )
 
     # --------------------------------------------------------
-    # Web Search
+    # Current Information
     # --------------------------------------------------------
 
     if "current_information" in intents:
@@ -1188,60 +909,60 @@ def ask_agent(
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "query": contextual_question
+                    "question": standalone_question
                 },
                 ensure_ascii=False
             )
         }
 
-        tool_trace.append(trace)
-
-        search_result = execute_web_search(
-            contextual_question
+        tool_trace.append(
+            trace
         )
 
-        if search_result["success"]:
+        web_result = execute_web_search(
+            standalone_question
+        )
 
-            trace["status"] = "success"
+        trace["status"] = (
+            "success"
+            if web_result["success"]
+            else "error"
+        )
 
-            try:
-
-                parsed_result = json.loads(
-                    search_result["result"]
-                )
-
-                if isinstance(
-                    parsed_result,
-                    list
-                ):
-
-                    for source in parsed_result:
-
-                        source["source_id"] = (
-                            len(web_sources) + 1
-                        )
-
-                        web_sources.append(
-                            source
-                        )
-
-            except Exception:
-
-                pass
-
-        else:
-
-            trace["status"] = "error"
+        trace["result"] = web_result.get(
+            "result",
+            ""
+        )
 
         tool_results.append(
             {
                 "tool": "web_search",
-                "data": search_result
+                "data": web_result
             }
         )
 
+        try:
+
+            parsed_sources = json.loads(
+                web_result.get(
+                    "result",
+                    "[]"
+                )
+            )
+
+            if isinstance(
+                parsed_sources,
+                list
+            ):
+
+                web_sources = parsed_sources
+
+        except Exception:
+
+            web_sources = []
+
     # --------------------------------------------------------
-    # Quiz Generator
+    # Quiz
     # --------------------------------------------------------
 
     if "quiz" in intents:
@@ -1252,22 +973,29 @@ def ask_agent(
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "question": contextual_question
+                    "question": standalone_question
                 },
                 ensure_ascii=False
             )
         }
 
-        tool_trace.append(trace)
+        tool_trace.append(
+            trace
+        )
 
         quiz_result = execute_quiz(
-            contextual_question
+            standalone_question
         )
 
         trace["status"] = (
             "success"
             if quiz_result["success"]
             else "error"
+        )
+
+        trace["result"] = quiz_result.get(
+            "result",
+            ""
         )
 
         tool_results.append(
@@ -1278,7 +1006,7 @@ def ask_agent(
         )
 
     # --------------------------------------------------------
-    # Study Plan Generator
+    # Study Plan
     # --------------------------------------------------------
 
     if "study_plan" in intents:
@@ -1289,28 +1017,35 @@ def ask_agent(
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "question": contextual_question
+                    "question": standalone_question
                 },
                 ensure_ascii=False
             )
         }
 
-        tool_trace.append(trace)
+        tool_trace.append(
+            trace
+        )
 
-        study_result = execute_study_plan(
-            contextual_question
+        study_plan_result = execute_study_plan(
+            standalone_question
         )
 
         trace["status"] = (
             "success"
-            if study_result["success"]
+            if study_plan_result["success"]
             else "error"
+        )
+
+        trace["result"] = study_plan_result.get(
+            "result",
+            ""
         )
 
         tool_results.append(
             {
                 "tool": "study_plan_generator",
-                "data": study_result
+                "data": study_plan_result
             }
         )
 
@@ -1332,85 +1067,71 @@ def ask_agent(
             )
         }
 
-        tool_trace.append(trace)
+        tool_trace.append(
+            trace
+        )
 
-        try:
+        weak_topics_result = weak_topic_detector(
+            progress
+        )
 
-            weak_topic_result = weak_topic_detector(
-                progress
-            )
+        trace["status"] = "success"
 
-            trace["status"] = "success"
+        trace["result"] = weak_topics_result
 
-            tool_results.append(
-                {
-                    "tool": "weak_topic_detector",
-                    "data": {
-                        "success": True,
-                        "result": weak_topic_result
-                    }
+        tool_results.append(
+            {
+                "tool": "weak_topic_detector",
+                "data": {
+                    "success": True,
+                    "result": weak_topics_result
                 }
-            )
-
-        except Exception as e:
-
-            trace["status"] = "error"
-
-            tool_results.append(
-                {
-                    "tool": "weak_topic_detector",
-                    "data": {
-                        "success": False,
-                        "result": (
-                            f"Weak topic detector error: {str(e)}"
-                        )
-                    }
-                }
-            )
+            }
+        )
 
     # --------------------------------------------------------
-# Targeted Revision
-# --------------------------------------------------------
+    # Targeted Revision
+    # --------------------------------------------------------
 
-if "weak_topic" in intents:
+    if "weak_topic" in intents:
 
-    trace = {
-        "step": len(tool_trace) + 1,
-        "tool": "targeted_revision",
-        "status": "running",
-        "arguments": json.dumps(
-            {
-                "progress_items": len(progress)
-            },
-            ensure_ascii=False
-        )
-    }
-
-    tool_trace.append(trace)
-
-    revision_result = generate_targeted_revision(
-        progress
-    )
-
-    trace["status"] = (
-        "success"
-        if revision_result["success"]
-        else "error"
-    )
-
-    trace["result"] = revision_result.get(
-        "result",
-        ""
-    )
-
-    tool_results.append(
-        {
+        trace = {
+            "step": len(tool_trace) + 1,
             "tool": "targeted_revision",
-            "data": revision_result
+            "status": "running",
+            "arguments": json.dumps(
+                {
+                    "progress_items": len(progress)
+                },
+                ensure_ascii=False
+            )
         }
-    )
 
-    
+        tool_trace.append(
+            trace
+        )
+
+        revision_result = generate_targeted_revision(
+            progress
+        )
+
+        trace["status"] = (
+            "success"
+            if revision_result["success"]
+            else "error"
+        )
+
+        trace["result"] = revision_result.get(
+            "result",
+            ""
+        )
+
+        tool_results.append(
+            {
+                "tool": "targeted_revision",
+                "data": revision_result
+            }
+        )
 
     # --------------------------------------------------------
     # Quiz Result Analyzer
@@ -1424,16 +1145,18 @@ if "weak_topic" in intents:
             "status": "running",
             "arguments": json.dumps(
                 {
-                    "question": contextual_question
+                    "question": standalone_question
                 },
                 ensure_ascii=False
             )
         }
 
-        tool_trace.append(trace)
+        tool_trace.append(
+            trace
+        )
 
         quiz_result_analysis = execute_quiz_result(
-            contextual_question
+            standalone_question
         )
 
         trace["status"] = (
@@ -1441,13 +1164,11 @@ if "weak_topic" in intents:
             if quiz_result_analysis["success"]
             else "error"
         )
+
         trace["result"] = quiz_result_analysis.get(
-           "result",
-           ""
+            "result",
+            ""
         )
-            
-            
-        
 
         tool_results.append(
             {
@@ -1456,89 +1177,126 @@ if "weak_topic" in intents:
             }
         )
 
-    # ========================================================
-    # STEP 3 — FINAL AI RESPONSE
-    # ========================================================
+    # --------------------------------------------------------
+    # Direct Answer
+    # --------------------------------------------------------
 
-    final_context = {
-        "user_question": question,
-        "resolved_question": contextual_question,
-        "detected_intents": intents,
-        "learning_progress": progress,
-        "tool_results": tool_results
-    }
+    if not tool_results:
 
-    final_messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are EduAgent AI, an intelligent education "
-                "assistant.\n\n"
+        final_answer_messages = [
 
-                "Answer the user's question using the tool "
-                "results and learning progress provided below.\n\n"
+            {
+                "role": "system",
+                "content": """
+You are EduAgent AI, an educational AI assistant.
 
-                "IMPORTANT RULES:\n"
-                "1. Use the calculator result for numerical answers.\n"
-                "2. Do not recalculate numerical results yourself "
-                "when a calculator result is available.\n"
-                "3. For current information, use only information "
-                "returned by web_search.\n"
-                "4. Do not invent sources, URLs, facts, or citations.\n"
-                "5. If a tool failed or information is insufficient, "
-                "clearly say so.\n"
-                "6. If multiple tasks exist, answer ALL of them.\n"
-                "7. Use stored learning progress only when relevant.\n"
-                "8. Never invent or assume a user's score.\n"
-                "9. When weak_topic_detector returns weak topics, "
-                "clearly identify those topics and explain that they "
-                "are flagged because their recorded percentage score "
-                "is below 70%.\n"
-                "10. If no weak topics are returned, do not invent any. "
-                "Say that no recorded topic currently meets the "
-                "weak-topic threshold.\n"
-                "11. When quiz_result_analyzer returns a performance "
-                "classification, clearly explain the classification "
-                "and its recommendation.\n"
-                "12. Give a clear, well-structured educational answer.\n"
-                "13. Do not mention internal orchestration unless "
-                "the user asks about it."
-            )
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                final_context,
-                ensure_ascii=False,
-                indent=2
-            )
-        }
-    ]
+Give a clear, accurate and student-friendly answer.
+
+Use simple language.
+
+If the question is educational,
+explain the concept step by step when useful.
+"""
+            },
+
+            {
+                "role": "user",
+                "content": standalone_question
+            }
+
+        ]
+
+    else:
+
+        final_answer_messages = [
+
+            {
+                "role": "system",
+                "content": """
+You are EduAgent AI.
+
+Generate the final answer using the tool results.
+
+Do not mention internal routing,
+tool execution,
+agent architecture,
+or hidden implementation details.
+
+Give the user a clear and useful educational response.
+
+If current information was retrieved,
+use the retrieved information carefully.
+
+If learning progress or weak topics are present,
+give actionable revision guidance.
+"""
+            },
+
+            {
+                "role": "user",
+                "content": f"""
+User question:
+
+{standalone_question}
+
+Learning progress:
+
+{json.dumps(progress, ensure_ascii=False)}
+
+Tool results:
+
+{json.dumps(tool_results, ensure_ascii=False)}
+
+Write the final answer.
+"""
+            }
+
+        ]
+
+    # --------------------------------------------------------
+    # Generate Final Answer
+    # --------------------------------------------------------
 
     try:
 
         final_response = client.chat.completions.create(
+
             model="openai/gpt-oss-20b",
-            messages=final_messages,
+
+            messages=final_answer_messages,
+
             temperature=0.2
         )
 
         final_answer = (
-            final_response.choices[0].message.content
-            or "I could not generate a final answer."
+            final_response
+            .choices[0]
+            .message
+            .content
         )
 
     except Exception as e:
 
         final_answer = (
-            "EduAgent AI completed the required tools, "
-            "but could not generate the final response. "
-            f"Error: {str(e)}"
+            f"Final response error: {str(e)}"
         )
 
-    # ========================================================
-    # STEP 4 — SAVE CONVERSATION MEMORY
-    # ========================================================
+    # --------------------------------------------------------
+    # Add Final Response To Trace
+    # --------------------------------------------------------
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "final_response",
+            "status": "success",
+            "result": final_answer
+        }
+    )
+
+    # --------------------------------------------------------
+    # Save Conversation Memory
+    # --------------------------------------------------------
 
     conversation_memory.setdefault(
         session_id,
@@ -1547,32 +1305,25 @@ if "weak_topic" in intents:
 
     conversation_memory[session_id].append(
         {
-            "question": question,
-            "answer": final_answer
+            "user": question,
+            "assistant": final_answer
         }
     )
 
     conversation_memory[session_id] = (
-        conversation_memory[session_id][-MAX_HISTORY:]
+        conversation_memory[session_id][
+            -MAX_HISTORY:
+        ]
     )
 
-    # ========================================================
-    # FINAL TRACE
-    # ========================================================
+    # --------------------------------------------------------
+    # Final Return
+    # --------------------------------------------------------
 
-    tool_trace.append(
-        {
-            "step": len(tool_trace) + 1,
-            "tool": "final_response",
-            "status": "success",
-            "arguments": "{}"
-        }
-    )
-
-     return {
-              "answer": final_answer,
-              "tool_trace": tool_trace,
-              "sources": web_sources
+    return {
+        "answer": final_answer,
+        "tool_trace": tool_trace,
+        "sources": web_sources
         }
                 
 
