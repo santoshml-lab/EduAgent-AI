@@ -9,7 +9,6 @@ from tools import (
     TOOLS,
     calculator,
     web_search,
-    education_router,
     quiz_generator,
     study_plan_generator,
     weak_topic_detector,
@@ -21,7 +20,6 @@ load_dotenv()
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
-
 
 # ============================================================
 # Conversation Memory
@@ -740,6 +738,21 @@ def ask_agent(
     )
 
     # --------------------------------------------------------
+    # Router Tools
+    # --------------------------------------------------------
+    # quiz_result_analyzer is NOT exposed to the router.
+    # This prevents Groq from sending null values for
+    # total_questions and correct_answers.
+    # --------------------------------------------------------
+
+    router_tools = [
+        tool
+        for tool in TOOLS
+        if tool["function"]["name"]
+        != "quiz_result_analyzer"
+    ]
+
+    # --------------------------------------------------------
     # Router
     # --------------------------------------------------------
 
@@ -760,17 +773,24 @@ Classify the user's request into one or more of these intents:
 6. weak_topic
 7. quiz_result
 
-Important priority:
+IMPORTANT:
 
-- quiz_result → when the user reports a quiz score
-- weak_topic → when the user asks what to revise next or asks about weak topics
-- study_plan → when the user requests a study plan
-- quiz → when the user requests a quiz
-- numerical → when calculation is required
-- current_information → when latest/current/recent information is needed
-- explanation → normal educational explanation
+For quiz_result:
+- Only classify the request as quiz_result.
+- DO NOT call quiz_result_analyzer.
+- Quiz result analysis is handled separately by the application.
 
-Use the available tools when appropriate.
+Priority:
+
+quiz_result
+weak_topic
+study_plan
+quiz
+numerical
+current_information
+explanation
+
+Use the available tools only when appropriate.
 
 Always choose the most relevant intent.
 """
@@ -791,7 +811,7 @@ Always choose the most relevant intent.
 
             messages=router_messages,
 
-            tools=TOOLS,
+            tools=router_tools,
 
             tool_choice="required",
 
@@ -1178,7 +1198,7 @@ Always choose the most relevant intent.
         )
 
     # --------------------------------------------------------
-    # Direct Answer
+    # Final Answer
     # --------------------------------------------------------
 
     if not tool_results:
@@ -1324,7 +1344,7 @@ Write the final answer.
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-        }
+    }
                 
 
 
