@@ -696,28 +696,45 @@ Latest question:
 
         return question
 
-
-# ============================================================
-# Main Agent
-# ============================================================
-
-def ask_agent(
+    def ask_agent(
     question: str,
     session_id: str = "default"
 ):
 
-      # --------------------------------------------------------
+    # --------------------------------------------------------
     # Resolve Context
     # --------------------------------------------------------
 
-        standalone_question = resolve_context(
+    standalone_question = resolve_context(
         question,
         session_id
     )
 
-    # ============================================================
+    # --------------------------------------------------------
+    # Learning Progress Extraction
+    # --------------------------------------------------------
+
+    progress_update = extract_learning_progress(
+        question
+    )
+
+    save_learning_progress(
+        session_id,
+        progress_update
+    )
+
+    # --------------------------------------------------------
+    # Current Progress
+    # --------------------------------------------------------
+
+    progress = learning_progress.get(
+        session_id,
+        []
+    )
+
+    # ========================================================
     # Direct Quiz Result Detection
-    # ============================================================
+    # ========================================================
 
     quiz_result_match = re.search(
         r"\b(?:scored|got|achieved|received)\s+(\d+(?:\.\d+)?)\s*%",
@@ -758,6 +775,10 @@ def ask_agent(
             ""
         )
 
+        # ----------------------------------------------------
+        # Save Conversation Memory
+        # ----------------------------------------------------
+
         conversation_memory.setdefault(
             session_id,
             []
@@ -783,44 +804,10 @@ def ask_agent(
         }
 
     # --------------------------------------------------------
-    # Learning Progress Extraction
-    # --------------------------------------------------------
-
-    progress_update = extract_learning_progress(
-        question
-    )
-        
-    
-
-
-    # --------------------------------------------------------
-    # Learning Progress Extraction
-    # --------------------------------------------------------
-
-    progress_update = extract_learning_progress(
-        question
-    )
-
-    save_learning_progress(
-        session_id,
-        progress_update
-    )
-
-    # --------------------------------------------------------
-    # Current Progress
-    # --------------------------------------------------------
-
-    progress = learning_progress.get(
-        session_id,
-        []
-    )
-
-    # --------------------------------------------------------
     # Router Tools
     # --------------------------------------------------------
     # quiz_result_analyzer is NOT exposed to the router.
-    # This prevents Groq from sending null values for
-    # total_questions and correct_answers.
+    # This prevents Groq from sending null values.
     # --------------------------------------------------------
 
     router_tools = [
@@ -829,6 +816,23 @@ def ask_agent(
         if tool["function"]["name"]
         != "quiz_result_analyzer"
     ]
+
+
+
+    
+
+
+
+
+
+        
+        
+    
+
+
+    
+
+    
 
     # --------------------------------------------------------
     # Router
