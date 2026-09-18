@@ -557,8 +557,12 @@ TOOLS = [
                         "type": "integer"
                     },
                     "correct_answers": {
-                        "type": "integer"
+                        "type": "integer",
+                        "default": 0
                     }
+                    
+                        
+                    
                 },
                 "required": [
                     "subject",
