@@ -17,9 +17,15 @@ from tools import (
 
 load_dotenv()
 
+
+# ============================================================
+# Groq Client
+# ============================================================
+
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
+
 
 # ============================================================
 # Conversation Memory
@@ -696,7 +702,12 @@ Latest question:
 
         return question
 
- def ask_agent(
+
+# ============================================================
+# Main Agent
+# ============================================================
+
+def ask_agent(
     question: str,
     session_id: str = "default"
 ):
@@ -806,9 +817,6 @@ Latest question:
     # --------------------------------------------------------
     # Router Tools
     # --------------------------------------------------------
-    # quiz_result_analyzer is NOT exposed to the router.
-    # This prevents Groq from sending null values.
-    # --------------------------------------------------------
 
     router_tools = [
         tool
@@ -816,23 +824,6 @@ Latest question:
         if tool["function"]["name"]
         != "quiz_result_analyzer"
     ]
-
-
-
-    
-
-
-
-
-
-        
-        
-    
-
-
-    
-
-    
 
     # --------------------------------------------------------
     # Router
@@ -1238,6 +1229,9 @@ Always choose the most relevant intent.
     # --------------------------------------------------------
     # Quiz Result Analyzer
     # --------------------------------------------------------
+    # Normally handled by Direct Quiz Result Detection.
+    # This fallback remains for router classification.
+    # --------------------------------------------------------
 
     if "quiz_result" in intents:
 
@@ -1426,7 +1420,7 @@ Write the final answer.
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-    }
+                }
                 
 
 
