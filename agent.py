@@ -195,7 +195,106 @@ def execute_web_search(question: str):
         return {
             "success": False,
             "result": f"Web search error: {str(e)}"
+# ============================================================
+# Helper: Validate Tool Result
+# ============================================================
+
+def validate_tool_result(
+    question: str,
+    tool_name: str,
+    tool_result
+):
+
+    try:
+
+        response = client.chat.completions.create(
+
+            model="openai/gpt-oss-20b",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are the validation layer of EduAgent AI.
+
+Check whether the tool result is useful and relevant
+for answering the user's question.
+
+Return ONLY valid JSON:
+
+{
+  "valid": true,
+  "reason": "",
+  "needs_retry": false
+}
+
+Rules:
+
+- valid = true if the result is relevant and usable.
+- valid = false if the result is clearly incorrect,
+  empty, irrelevant, or unusable.
+- needs_retry = true only when another tool attempt
+  could reasonably fix the problem.
+- Do not invent facts.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+User question:
+
+{question}
+
+Tool used:
+
+{tool_name}
+
+Tool result:
+
+{json.dumps(tool_result, ensure_ascii=False)}
+
+Validate this result.
+"""
+                }
+            ],
+
+            temperature=0
+        )
+
+        content = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+        content = re.sub(
+            r"^```json\s*",
+            "",
+            content,
+            flags=re.IGNORECASE
+        )
+
+        content = re.sub(
+            r"\s*```$",
+            "",
+            content
+        )
+
+        return json.loads(content)
+
+    except Exception as e:
+
+        return {
+            "valid": True,
+            "reason": f"Validation fallback: {str(e)}",
+            "needs_retry": False
         }
+
+
+
+
 
 def execute_quiz(question: str):
 
