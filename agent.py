@@ -35,6 +35,38 @@ conversation_memory = {}
 
 MAX_HISTORY = 6
 
+def get_conversation_history(session_id: str):
+
+    history = conversation_memory.get(
+        session_id,
+        []
+    )
+
+    messages = []
+
+    for item in history:
+        messages.append(
+            {
+                "role": "user",
+                "content": item.get(
+                    "user",
+                    ""
+                )
+            }
+        )
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": item.get(
+                    "assistant",
+                    ""
+                )
+            }
+        )
+
+    return messages
+
 
 # ============================================================
 # Learning Progress Memory
@@ -756,6 +788,9 @@ def ask_agent(
     # --------------------------------------------------------
 
     standalone_question = question
+    conversation_history = get_conversation_history(
+    session_id
+    )
 
     # --------------------------------------------------------
     # Direct Quiz Detection
