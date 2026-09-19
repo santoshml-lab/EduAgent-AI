@@ -2099,14 +2099,14 @@ Write the final answer.
 
     try:
 
-    final_response = client.chat.completions.create(
+        final_response = client.chat.completions.create(
 
-        model="openai/gpt-oss-20b",
+            model="openai/gpt-oss-20b",
 
-        messages=[
-            {
-                "role": "system",
-                "content": """
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are the final answer generator of EduAgent AI.
 
 IMPORTANT:
@@ -2114,19 +2114,19 @@ IMPORTANT:
 - Do NOT generate tool calls.
 - Do NOT request web search.
 - Do NOT request calculator.
-- Use ONLY the information already provided in the user message.
+- Use ONLY the information already provided.
 - Return ONLY the final natural-language answer for the user.
 - Never output JSON.
 - Never mention internal tools, routing, validation, retries,
   agent architecture, or implementation details.
 """
-            },
+                },
 
-            *conversation_history,
+                *conversation_history,
 
-            {
-                "role": "user",
-                "content": f"""
+                {
+                    "role": "user",
+                    "content": f"""
 User question:
 
 {standalone_question}
@@ -2141,26 +2141,28 @@ Available tool results:
 
 Using ONLY the information above, write the final answer.
 """
-            }
-        ],
+                }
+            ],
 
-        temperature=0.2,
+            temperature=0.2,
 
-        tool_choice="none"
-    )
+            tool_choice="none"
+        )
 
-    final_answer = (
-        final_response
-        .choices[0]
-        .message
-        .content
-    )
+        final_answer = (
+            final_response
+            .choices[0]
+            .message
+            .content
+        )
 
- 1 except Exception as e:
+    except Exception as e:
 
-    final_answer = (
-        f"Final response error: {str(e)}"
-    )
+        final_answer = (
+            f"Final response error: {str(e)}"
+        )
+
+
 
     # --------------------------------------------------------
     # Add Final Response To Trace
