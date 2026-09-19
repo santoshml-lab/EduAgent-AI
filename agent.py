@@ -1807,6 +1807,80 @@ Use the available tools only when appropriate.
         tool_trace.append(
             planner_trace
     )
+
+# --------------------------------------------------------
+# Execute Planned Steps
+# --------------------------------------------------------
+
+if plan.get("needs_planning", False):
+
+    for planned_step in plan.get("steps", []):
+
+        planned_tool = planned_step.get("tool")
+
+        if planned_tool == "weak_topic_detector":
+
+            weak_result = weak_topic_detector(
+                [
+                    {
+                        "subject": "Biology",
+                        "score": 62,
+                        "score_type": "percentage"
+                    }
+                ]
+            )
+
+            tool_results.append({
+                "tool": "weak_topic_detector",
+                "result": weak_result
+            })
+
+            tool_trace.append({
+                "step": len(tool_trace) + 1,
+                "tool": "weak_topic_detector",
+                "status": "success",
+                "arguments": json.dumps(
+                    {
+                        "subject": "Biology",
+                        "score": 62,
+                        "score_type": "percentage"
+                    },
+                    ensure_ascii=False
+                ),
+                "result": weak_result
+            })
+
+        elif planned_tool == "study_plan_generator":
+
+            plan_result = study_plan_generator(
+                days=7,
+                hours_per_day=1,
+                focus_topics=[
+                    "Biology"
+                ]
+            )
+
+            tool_results.append({
+                "tool": "study_plan_generator",
+                "result": plan_result
+            })
+
+            tool_trace.append({
+                "step": len(tool_trace) + 1,
+                "tool": "study_plan_generator",
+                "status": "success",
+                "arguments": json.dumps(
+                    {
+                        "days": 7,
+                        "hours_per_day": 1,
+                        "focus_topics": [
+                            "Biology"
+                        ]
+                    },
+                    ensure_ascii=False
+                ),
+                "result": plan_result
+            })
     
 
     
