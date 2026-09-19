@@ -227,7 +227,7 @@ Return ONLY valid JSON:
   "valid": true,
   "reason": "",
   "needs_retry": false,
-  retry_strategy
+  "retry_strategy": "none"
 }
 
 Rules:
