@@ -1622,11 +1622,11 @@ Always choose the most relevant intent.
 
     if not tool_results:
 
-        final_answer_messages = [
+    final_answer_messages = [
 
-            {
-                "role": "system",
-                "content": """
+        {
+            "role": "system",
+            "content": """
 You are EduAgent AI, an educational AI assistant.
 
 Give a clear, accurate and student-friendly answer.
@@ -1636,14 +1636,16 @@ Use simple language.
 If the question is educational,
 explain the concept step by step when useful.
 """
-            },
+        },
 
-            {
-                "role": "user",
-                "content": standalone_question
-            }
+        *conversation_history,
 
-        ]
+        {
+            "role": "user",
+            "content": standalone_question
+        }
+
+    ]
 
     else:
 
@@ -1670,6 +1672,8 @@ If learning progress or weak topics are present,
 give actionable revision guidance.
 """
             },
+            *conversation_history,
+            
 
             {
                 "role": "user",
