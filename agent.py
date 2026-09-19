@@ -1874,10 +1874,10 @@ Use the available tools only when appropriate.
         # Validate Web Search Result
         # ----------------------------------------------------
 
-            web_validation = validate_tool_result(
-            question=standalone_question,
-            tool_name="web_search",
-            tool_result=web_result
+        web_validation = validate_tool_result(
+        question=standalone_question,
+        tool_name="web_search",
+        tool_result=web_result
         )
 
         # ----------------------------------------------------
