@@ -1874,11 +1874,33 @@ Use the available tools only when appropriate.
         # Validate Web Search Result
         # ----------------------------------------------------
 
-        web_validation = validate_tool_result(
+            web_validation = validate_tool_result(
             question=standalone_question,
             tool_name="web_search",
             tool_result=web_result
         )
+
+        # ----------------------------------------------------
+        # Deterministic Version Conflict Check
+        # ----------------------------------------------------
+
+        version_check = detect_version_conflict(
+            question=standalone_question,
+            tool_result=web_result
+        )
+
+        if version_check.get("conflict", False):
+
+            web_validation = {
+                "valid": False,
+                "reason": version_check.get(
+                    "reason",
+                    "Version conflict detected."
+                ),
+                "needs_retry": True,
+                "retry_strategy": "new_search"
+            }
+
         tool_trace.append(
             {
                 "step": len(tool_trace) + 1,
@@ -1896,7 +1918,8 @@ Use the available tools only when appropriate.
                 ),
                 "result": web_validation
             }
-                )
+        )
+  
 
         # ----------------------------------------------------
         # Smart Web Search Retry
