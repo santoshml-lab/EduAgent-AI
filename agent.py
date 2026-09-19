@@ -199,6 +199,37 @@ def execute_web_search(question: str):
             "result": f"Web search error: {str(e)}"
         }
 
+# ============================================================
+# Helper: Execute Web Search Retry
+# ============================================================
+
+def execute_web_search_retry(question: str):
+
+    query = (
+        f"{question} latest stable release "
+        f"official source 2026"
+    )
+
+    try:
+
+        result = web_search(
+            query
+        )
+
+        return {
+            "success": True,
+            "query": query,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "query": query,
+            "result": f"Web search retry error: {str(e)}"
+        }8
+
 
 # ============================================================
 # Helper: Validate Tool Result
@@ -1703,9 +1734,11 @@ Use the available tools only when appropriate.
 
             tool_trace.append(retry_trace)
 
-            web_result = execute_web_search(
-                standalone_question
+            web_result = execute_web_search_retry(
+            standalone_question
             )
+                
+            
 
             retry_trace["status"] = (
                 "success"
