@@ -291,11 +291,12 @@ def study_plan_generator(
     topics: str = ""
 ):
     """
-    Generate a grounded study-plan instruction using only
-    the topics provided by the learning-progress system.
+    Generate a grounded study plan.
 
     Important:
-    This function must never invent academic subtopics.
+    - Uses only explicitly provided topics.
+    - Never invents academic subtopics.
+    - Creates the day-by-day structure deterministically.
     """
 
     if days < 1:
@@ -309,6 +310,128 @@ def study_plan_generator(
 
     if hours_per_day > 12:
         hours_per_day = 12
+
+    # --------------------------------------------------------
+    # Parse topics
+    # --------------------------------------------------------
+
+    parsed_topics = []
+
+    try:
+        if isinstance(topics, str):
+            parsed_topics = json.loads(topics)
+        elif isinstance(topics, list):
+            parsed_topics = topics
+    except Exception:
+        parsed_topics = []
+
+    # --------------------------------------------------------
+    # Keep only explicit topics
+    # --------------------------------------------------------
+
+    grounded_topics = []
+
+    for item in parsed_topics:
+
+        if not isinstance(item, dict):
+            continue
+
+        topic = str(
+            item.get("topic", "")
+        ).strip()
+
+        score = item.get("score")
+
+        if not topic:
+            continue
+
+        grounded_topics.append(
+            {
+                "topic": topic,
+                "score": score
+            }
+        )
+
+    # --------------------------------------------------------
+    # Create deterministic study plan
+    # --------------------------------------------------------
+
+    study_days = []
+
+    if grounded_topics:
+
+        topic_count = len(grounded_topics)
+
+        for day in range(1, days + 1):
+
+            topic_index = (day - 1) % topic_count
+
+            selected_topic = grounded_topics[topic_index]
+
+            if day == days:
+                activity = (
+                    "Revision + mixed practice + self-assessment"
+                )
+            elif day <= topic_count:
+                activity = (
+                    "Topic revision + practice questions"
+                )
+            else:
+                activity = (
+                    "Revision + practice + error review"
+                )
+
+            study_days.append(
+                {
+                    "day": day,
+                    "topic": selected_topic["topic"],
+                    "activity": activity,
+                    "hours": hours_per_day
+                }
+            )
+
+    else:
+
+        for day in range(1, days + 1):
+
+            if day == days:
+                activity = (
+                    "General revision + self-assessment"
+                )
+            else:
+                activity = (
+                    "General study + practice"
+                )
+
+            study_days.append(
+                {
+                    "day": day,
+                    "topic": subject,
+                    "activity": activity,
+                    "hours": hours_per_day
+                }
+            )
+
+    # --------------------------------------------------------
+    # Final structured result
+    # --------------------------------------------------------
+
+    return json.dumps(
+        {
+            "subject": subject,
+            "days": days,
+            "hours_per_day": hours_per_day,
+            "topics": grounded_topics,
+            "study_plan": study_days,
+            "rules": [
+                "Use only explicitly provided topics.",
+                "Do not invent academic subtopics.",
+                "Do not infer missing topic details."
+            ]
+        },
+        ensure_ascii=False
+    )
+    
 
     # --------------------------------------------------------
     # Parse weak-topic data
