@@ -195,6 +195,7 @@ def execute_web_search(question: str):
         return {
             "success": False,
             "result": f"Web search error: {str(e)}"
+        }
 # ============================================================
 # Helper: Validate Tool Result
 # ============================================================
