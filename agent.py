@@ -1785,6 +1785,7 @@ Use the available tools only when appropriate.
 
     tool_trace = []
     tool_results = []
+    web_sources = []
 
     if planner_trace:
 
