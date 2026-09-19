@@ -1273,7 +1273,7 @@ Write a concise and useful revision recommendation.
     # Router
     # --------------------------------------------------------
 
-   router_messages = [
+    router_messages = [
 
         {
             "role": "system",
