@@ -1382,8 +1382,8 @@ Use the available tools only when appropriate.
             "tool_trace": [],
             "sources": []
         }
-   print("ROUTER RESPONSE:")
-   print(router_response)
+    print("ROUTER RESPONSE:")
+    print(router_response)
  
     
 
