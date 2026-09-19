@@ -541,7 +541,11 @@ Schema:
 {
   "needs_planning": true,
   "goal": "",
+  "subject": "",
+  "days": 7,
+  "hours_per_day": 1,
   "steps": [
+  
     {
       "step": 1,
       "tool": "",
@@ -571,6 +575,26 @@ Rules:
 - Keep the plan concise.
 - Steps must be ordered logically.
 - Do not answer the user's question.
+- Extract the subject, number of days, and hours per day
+  only when they are explicitly provided by the user.
+
+- Never invent a subject, number of days, or study hours.
+
+- If the user does not explicitly provide the number of days,
+  use 7.
+
+- If the user does not explicitly provide hours per day,
+  use 1.
+
+- For study-plan requests, return these additional fields:
+  "subject": "",
+  "days": 7,
+  "hours_per_day": 1
+
+- The subject must come from the user's request or the
+  learning-progress data available in the conversation.
+
+- Do not create academic subtopics that the user did not provide.
 """
 
 
