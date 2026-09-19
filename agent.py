@@ -1414,7 +1414,7 @@ Always choose the most relevant intent.
             trace
         )
 
-        calculator_result = execute_calculator(
+                calculator_result = execute_calculator(
             standalone_question
         )
 
@@ -1429,12 +1429,43 @@ Always choose the most relevant intent.
             ""
         )
 
+        # ----------------------------------------------------
+        # Validate Calculator Result
+        # ----------------------------------------------------
+
+        validation_result = validate_tool_result(
+            question=standalone_question,
+            tool_name="calculator",
+            tool_result=calculator_result
+        )
+
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "result_validator",
+                "status": (
+                    "success"
+                    if validation_result.get("valid", False)
+                    else "rejected"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "validated_tool": "calculator"
+                    },
+                    ensure_ascii=False
+                ),
+                "result": validation_result
+            }
+        )
+
         tool_results.append(
             {
                 "tool": "calculator",
-                "data": calculator_result
+                "data": calculator_result,
+                "validation": validation_result
             }
         )
+            
 
     # --------------------------------------------------------
     # Current Information
