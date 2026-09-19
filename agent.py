@@ -1504,6 +1504,74 @@ Use the available tools only when appropriate.
             }
         )
 
+        # ----------------------------------------------------
+        # Retry Calculator Once If Validation Fails
+        # ----------------------------------------------------
+
+        if (
+            not validation_result.get("valid", False)
+            and validation_result.get("needs_retry", False)
+        ):
+
+            retry_result = execute_calculator(
+                standalone_question
+            )
+
+            retry_validation = validate_tool_result(
+                question=standalone_question,
+                tool_name="calculator_retry",
+                tool_result=retry_result
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "calculator_retry",
+                    "status": (
+                        "success"
+                        if retry_result["success"]
+                        else "error"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "question": standalone_question,
+                            "retry": True
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": retry_result.get(
+                        "result",
+                        ""
+                    )
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "result_validator_retry",
+                    "status": (
+                        "success"
+                        if retry_validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool":
+                                "calculator_retry"
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": retry_validation
+                }
+            )
+
+            calculator_result = retry_result
+            validation_result = retry_validation
+
         tool_results.append(
             {
                 "tool": "calculator",
@@ -1511,6 +1579,7 @@ Use the available tools only when appropriate.
                 "validation": validation_result
             }
         )
+        
             
 
     # --------------------------------------------------------
