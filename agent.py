@@ -1814,11 +1814,11 @@ Use the available tools only when appropriate.
 
    if plan.get("needs_planning", False):
 
-      for planned_step in plan.get("steps", []):
+       for planned_step in plan.get("steps", []):
 
         planned_tool = planned_step.get("tool")
 
-        if planned_tool == "weak_topic_detector":
+          if planned_tool == "weak_topic_detector":
 
             weak_result = weak_topic_detector(
                 [
