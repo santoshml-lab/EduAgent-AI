@@ -1622,7 +1622,7 @@ Always choose the most relevant intent.
 
     if not tool_results:
 
-    final_answer_messages = [
+         final_answer_messages = [
 
         {
             "role": "system",
