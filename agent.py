@@ -1849,10 +1849,15 @@ Use the available tools only when appropriate.
             elif planned_tool == "study_plan_generator":
 
                 plan_result = study_plan_generator(
-                    subject="Biology",
-                    days=7,
-                    hours_per_day=1
+                subject="Biology",
+                days=7,
+                hours_per_day=1,
+                topics=weak_result
                 )
+                    
+                    
+                    
+                
 
                 tool_results.append(
                     {
