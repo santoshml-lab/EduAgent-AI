@@ -1414,8 +1414,8 @@ Always choose the most relevant intent.
             trace
         )
 
-            calculator_result = execute_calculator(
-              standalone_question
+        calculator_result = execute_calculator(
+             standalone_question
         )
 
         trace["status"] = (
