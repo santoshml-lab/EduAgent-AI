@@ -1784,6 +1784,7 @@ Use the available tools only when appropriate.
     # --------------------------------------------------------
 
     tool_trace = []
+    tool_results = []
 
     if planner_trace:
 
