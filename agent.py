@@ -1518,12 +1518,18 @@ Use the available tools only when appropriate.
         )
 
         # ----------------------------------------------------
-        # Retry Calculator Once If Validation Fails
+        # Smart Retry Calculator Once If Validation Fails
         # ----------------------------------------------------
+
+        retry_strategy = validation_result.get(
+            "retry_strategy",
+            "none"
+        )
 
         if (
             not validation_result.get("valid", False)
             and validation_result.get("needs_retry", False)
+            and retry_strategy == "recalculate"
         ):
 
             retry_result = execute_calculator(
@@ -1548,7 +1554,8 @@ Use the available tools only when appropriate.
                     "arguments": json.dumps(
                         {
                             "question": standalone_question,
-                            "retry": True
+                            "retry": True,
+                            "strategy": "recalculate"
                         },
                         ensure_ascii=False
                     ),
@@ -1574,7 +1581,9 @@ Use the available tools only when appropriate.
                     "arguments": json.dumps(
                         {
                             "validated_tool":
-                                "calculator_retry"
+                                "calculator_retry",
+                            "strategy":
+                                "recalculate"
                         },
                         ensure_ascii=False
                     ),
@@ -1584,6 +1593,10 @@ Use the available tools only when appropriate.
 
             calculator_result = retry_result
             validation_result = retry_validation
+
+        
+        
+       
 
         tool_results.append(
             {
