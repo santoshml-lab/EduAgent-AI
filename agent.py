@@ -1148,8 +1148,8 @@ def save_learning_progress(
                 new_record
             )
 
-           learning_progress[session_id] = (
-           learning_progress[session_id][
+            learning_progress[session_id] = (
+            learning_progress[session_id][
             -MAX_PROGRESS_ITEMS:
         ]
     )
