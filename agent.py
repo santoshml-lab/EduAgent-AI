@@ -544,24 +544,39 @@ Schema:
   "steps": [
     {
       "step": 1,
+      "tool": "",
       "action": "",
       "reason": ""
     }
   ]
 }
 
+Allowed tools:
+
+- weak_topic_detector
+- study_plan_generator
+- quiz_generator
+- quiz_result_analyzer
+- web_search
+- calculator
+
 Rules:
 
-- Use planning only when the request requires multiple
-  dependent actions.
-- Simple questions should have needs_planning = false
-  and an empty steps list.
-- Do not invent tools.
-- Do not answer the user's question.
+- Use only the allowed tools.
+- Do not invent tool names.
+- Simple questions should have
+  needs_planning = false and an empty steps list.
+- Use multiple steps when one tool's result is needed
+  by a later step.
 - Keep the plan concise.
 - Steps must be ordered logically.
-- A later step may depend on the result of an earlier step.
+- Do not answer the user's question.
 """
+
+
+
+    
+    
                 },
                 {
                     "role": "user",
