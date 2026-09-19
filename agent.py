@@ -228,7 +228,7 @@ def execute_web_search_retry(question: str):
             "success": False,
             "query": query,
             "result": f"Web search retry error: {str(e)}"
-        }8
+        }
 
 
 # ============================================================
