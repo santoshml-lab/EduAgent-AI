@@ -1414,7 +1414,7 @@ Always choose the most relevant intent.
             trace
         )
 
-                calculator_result = execute_calculator(
+            calculator_result = execute_calculator(
             standalone_question
         )
 
