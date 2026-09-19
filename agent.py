@@ -35,6 +35,7 @@ conversation_memory = {}
 
 MAX_HISTORY = 6
 
+
 def get_conversation_history(session_id: str):
 
     history = conversation_memory.get(
@@ -45,6 +46,7 @@ def get_conversation_history(session_id: str):
     messages = []
 
     for item in history:
+
         messages.append(
             {
                 "role": "user",
@@ -196,6 +198,8 @@ def execute_web_search(question: str):
             "success": False,
             "result": f"Web search error: {str(e)}"
         }
+
+
 # ============================================================
 # Helper: Validate Tool Result
 # ============================================================
@@ -296,7 +300,9 @@ Validate this result.
             content
         )
 
-        return json.loads(content)
+        return json.loads(
+            content
+        )
 
     except Exception as e:
 
@@ -307,8 +313,9 @@ Validate this result.
         }
 
 
-
-
+# ============================================================
+# Helper: Execute Quiz
+# ============================================================
 
 def execute_quiz(question: str):
 
@@ -323,11 +330,12 @@ def execute_quiz(question: str):
     )
 
     if number_match:
-        number_of_questions = int(number_match.group(1))
+        number_of_questions = int(
+            number_match.group(1)
+        )
     else:
         number_of_questions = 5
 
-    # Keep quiz size within allowed range
     number_of_questions = max(
         1,
         min(number_of_questions, 20)
@@ -337,13 +345,24 @@ def execute_quiz(question: str):
     # Difficulty
     # --------------------------------------------------------
 
-    if re.search(r"\bhard\b|\bdifficult\b|\badvanced\b", question, re.IGNORECASE):
+    if re.search(
+        r"\bhard\b|\bdifficult\b|\badvanced\b",
+        question,
+        re.IGNORECASE
+    ):
+
         difficulty = "hard"
 
-    elif re.search(r"\beasy\b|\bbasic\b", question, re.IGNORECASE):
+    elif re.search(
+        r"\beasy\b|\bbasic\b",
+        question,
+        re.IGNORECASE
+    ):
+
         difficulty = "easy"
 
     else:
+
         difficulty = "medium"
 
     # --------------------------------------------------------
@@ -368,15 +387,20 @@ def execute_quiz(question: str):
     subject = "General Studies"
 
     for item in subjects:
+
         if re.search(
             rf"\b{re.escape(item)}\b",
             question,
             re.IGNORECASE
         ):
+
             subject = item
             break
 
-    # Normalize subject names
+    # --------------------------------------------------------
+    # Normalize Subject
+    # --------------------------------------------------------
+
     subject_map = {
         "biology": "Biology",
         "physics": "Physics",
@@ -403,8 +427,6 @@ def execute_quiz(question: str):
 
     topic = subject
 
-    # Case 1:
-    # "quiz on Biology about Cell"
     topic_match = re.search(
         r"(?:on|about)\s+"
         r"(?:biology|physics|chemistry|mathematics|math|"
@@ -417,12 +439,11 @@ def execute_quiz(question: str):
     )
 
     if topic_match:
+
         topic = topic_match.group(1).strip()
 
     else:
 
-        # Case 2:
-        # "quiz about Cell"
         topic_match = re.search(
             r"(?:about|on)\s+"
             r"(.+?)(?:\s+at|\s+with|\s*$)",
@@ -432,11 +453,13 @@ def execute_quiz(question: str):
 
         if topic_match:
 
-            extracted_topic = topic_match.group(1).strip()
+            extracted_topic = (
+                topic_match.group(1).strip()
+            )
 
-            # If extracted topic starts with the subject,
-            # remove the subject from it.
-            subject_pattern = re.escape(subject)
+            subject_pattern = re.escape(
+                subject
+            )
 
             extracted_topic = re.sub(
                 rf"^{subject_pattern}\s+(?:about|on)\s+",
@@ -452,7 +475,9 @@ def execute_quiz(question: str):
     # Clean Topic
     # --------------------------------------------------------
 
-    topic = topic.strip(" .,?!")
+    topic = topic.strip(
+        " .,?!"
+    )
 
     if not topic:
         topic = subject
@@ -473,36 +498,18 @@ def execute_quiz(question: str):
     # --------------------------------------------------------
 
     return {
-      "success": True,
-      "subject": subject,
-      "topic": topic,
-      "number_of_questions": number_of_questions,
-      "difficulty": difficulty,
-      "instruction": (
-        f"Generate {number_of_questions} "
-        f"{difficulty}-difficulty questions "
-        f"on {topic} in {subject}."
-    ),
-    "result": result
+        "success": True,
+        "subject": subject,
+        "topic": topic,
+        "number_of_questions": number_of_questions,
+        "difficulty": difficulty,
+        "instruction": (
+            f"Generate {number_of_questions} "
+            f"{difficulty}-difficulty questions "
+            f"on {topic} in {subject}."
+        ),
+        "result": result
     }
-        
-        
-
-
-
-
-
-
-
-
-
-    
-
-        
-            
-
-        
-        
 
 
 # ============================================================
@@ -538,7 +545,9 @@ def execute_study_plan(question: str):
         )
 
         subject_match = re.search(
-            r"(?:for|of)\s+(?:Class\s+\d+\s+)?(.+?)(?:\s+with|\s+for|\s*$)",
+            r"(?:for|of)\s+"
+            r"(?:Class\s+\d+\s+)?"
+            r"(.+?)(?:\s+with|\s+for|\s*$)",
             question,
             re.IGNORECASE
         )
@@ -615,7 +624,12 @@ Do not invent a score.
             temperature=0
         )
 
-        content = response.choices[0].message.content
+        content = (
+            response
+            .choices[0]
+            .message
+            .content
+        )
 
         content = content.strip()
 
@@ -901,8 +915,9 @@ def ask_agent(
     # --------------------------------------------------------
 
     standalone_question = question
+
     conversation_history = get_conversation_history(
-    session_id
+        session_id
     )
 
     # --------------------------------------------------------
@@ -942,53 +957,17 @@ def ask_agent(
                     },
                     ensure_ascii=False
                 ),
-                trace["result"] = web_result.get(
-                      "result",
-                      ""
-)
+                "result": quiz_result.get(
+                    "result",
+                    ""
+                )
+            }
+        ]
 
-# ----------------------------------------------------
-# Validate Web Search Result
-# ----------------------------------------------------
-
-    web_validation = validate_tool_result(
-    question=standalone_question,
-    tool_name="web_search",
-    tool_result=web_result
-)
-
-tool_trace.append(
-    {
-        "step": len(tool_trace) + 1,
-        "tool": "result_validator",
-        "status": (
-            "success"
-            if web_validation.get(
-                "valid",
-                False
-            )
-            else "rejected"
-        ),
-        "arguments": json.dumps(
-            {
-                "validated_tool": "web_search"
-            },
-            ensure_ascii=False
-        ),
-        "result": web_validation
-    }
-)
-
-tool_results.append(
-    {
-        "tool": "web_search",
-        "data": web_result,
-        "validation": web_validation
-    }
-)
-                    
-                    
-                
+        answer = quiz_result.get(
+            "result",
+            ""
+        )
 
         # ----------------------------------------------------
         # Save Conversation Memory
@@ -1232,7 +1211,8 @@ Write a concise and useful revision recommendation.
     # ========================================================
 
     quiz_result_match = re.search(
-        r"\b(?:scored|got|achieved|received)\s+(\d+(?:\.\d+)?)\s*%",
+        r"\b(?:scored|got|achieved|received)\s+"
+        r"(\d+(?:\.\d+)?)\s*%",
         standalone_question,
         re.IGNORECASE
     )
@@ -1336,7 +1316,7 @@ For numerical:
 - Use numerical when the user asks to calculate, solve, find the value of,
   multiply, divide, add, subtract, or evaluate a mathematical expression.
 - Mathematical expressions using symbols such as:
-  +, -, *, /, ×, ÷, =, %, ^ 
+  +, -, *, /, ×, ÷, =, %, ^
   should normally be classified as numerical when the user wants a result.
 - Examples:
   "What is 125 * 48?"
@@ -1422,12 +1402,6 @@ Use the available tools only when appropriate.
             "tool_trace": [],
             "sources": []
         }
-    print("ROUTER RESPONSE:")
-    print(router_response)
- 
-    
-
-
 
     # --------------------------------------------------------
     # Read Router Tool Calls
@@ -1451,22 +1425,40 @@ Use the available tools only when appropriate.
             )
 
             if tool_name == "calculator":
-                intents.append("numerical")
+
+                intents.append(
+                    "numerical"
+                )
 
             elif tool_name == "web_search":
-                intents.append("current_information")
+
+                intents.append(
+                    "current_information"
+                )
 
             elif tool_name == "quiz_generator":
-                intents.append("quiz")
+
+                intents.append(
+                    "quiz"
+                )
 
             elif tool_name == "study_plan_generator":
-                intents.append("study_plan")
+
+                intents.append(
+                    "study_plan"
+                )
 
             elif tool_name == "weak_topic_detector":
-                intents.append("weak_topic")
+
+                intents.append(
+                    "weak_topic"
+                )
 
             elif tool_name == "quiz_result_analyzer":
-                intents.append("quiz_result")
+
+                intents.append(
+                    "quiz_result"
+                )
 
     # --------------------------------------------------------
     # Tool Execution
@@ -1501,7 +1493,7 @@ Use the available tools only when appropriate.
         )
 
         calculator_result = execute_calculator(
-             standalone_question
+            standalone_question
         )
 
         trace["status"] = (
@@ -1531,7 +1523,10 @@ Use the available tools only when appropriate.
                 "tool": "result_validator",
                 "status": (
                     "success"
-                    if validation_result.get("valid", False)
+                    if validation_result.get(
+                        "valid",
+                        False
+                    )
                     else "rejected"
                 ),
                 "arguments": json.dumps(
@@ -1545,7 +1540,7 @@ Use the available tools only when appropriate.
         )
 
         # ----------------------------------------------------
-        # Smart Retry Calculator Once If Validation Fails
+        # Smart Retry Calculator Once
         # ----------------------------------------------------
 
         retry_strategy = validation_result.get(
@@ -1554,8 +1549,14 @@ Use the available tools only when appropriate.
         )
 
         if (
-            not validation_result.get("valid", False)
-            and validation_result.get("needs_retry", False)
+            not validation_result.get(
+                "valid",
+                False
+            )
+            and validation_result.get(
+                "needs_retry",
+                False
+            )
             and retry_strategy == "recalculate"
         ):
 
@@ -1619,11 +1620,8 @@ Use the available tools only when appropriate.
             )
 
             calculator_result = retry_result
-            validation_result = retry_validation
 
-        
-        
-       
+            validation_result = retry_validation
 
         tool_results.append(
             {
@@ -1632,8 +1630,6 @@ Use the available tools only when appropriate.
                 "validation": validation_result
             }
         )
-        
-            
 
     # --------------------------------------------------------
     # Current Information
@@ -1672,10 +1668,43 @@ Use the available tools only when appropriate.
             ""
         )
 
+        # ----------------------------------------------------
+        # Validate Web Search Result
+        # ----------------------------------------------------
+
+        web_validation = validate_tool_result(
+            question=standalone_question,
+            tool_name="web_search",
+            tool_result=web_result
+        )
+
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "result_validator",
+                "status": (
+                    "success"
+                    if web_validation.get(
+                        "valid",
+                        False
+                    )
+                    else "rejected"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "validated_tool": "web_search"
+                    },
+                    ensure_ascii=False
+                ),
+                "result": web_validation
+            }
+        )
+
         tool_results.append(
             {
                 "tool": "web_search",
-                "data": web_result
+                "data": web_result,
+                "validation": web_validation
             }
         )
 
@@ -1921,11 +1950,11 @@ Use the available tools only when appropriate.
 
     if not tool_results:
 
-         final_answer_messages = [
+        final_answer_messages = [
 
-        {
-            "role": "system",
-            "content": """
+            {
+                "role": "system",
+                "content": """
 You are EduAgent AI, an educational AI assistant.
 
 Give a clear, accurate and student-friendly answer.
@@ -1935,16 +1964,16 @@ Use simple language.
 If the question is educational,
 explain the concept step by step when useful.
 """
-        },
+            },
 
-        *conversation_history,
+            *conversation_history,
 
-        {
-            "role": "user",
-            "content": standalone_question
-        }
+            {
+                "role": "user",
+                "content": standalone_question
+            }
 
-    ]
+        ]
 
     else:
 
@@ -1971,8 +2000,8 @@ If learning progress or weak topics are present,
 give actionable revision guidance.
 """
             },
+
             *conversation_history,
-            
 
             {
                 "role": "user",
@@ -2066,7 +2095,7 @@ Write the final answer.
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-        }
+    }
                 
 
 
