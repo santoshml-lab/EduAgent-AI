@@ -1808,11 +1808,11 @@ Use the available tools only when appropriate.
             planner_trace
     )
 
-# --------------------------------------------------------
-# Execute Planned Steps
-# --------------------------------------------------------
+   # --------------------------------------------------------
+   # Execute Planned Steps
+   # --------------------------------------------------------
 
-if plan.get("needs_planning", False):
+   if plan.get("needs_planning", False):
 
     for planned_step in plan.get("steps", []):
 
