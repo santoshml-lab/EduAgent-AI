@@ -904,24 +904,96 @@ def extract_learning_progress(
                 {
                     "role": "system",
                     "content": """
-Extract learning progress from the user's message.
+Extract ALL learning progress records from the user's message.
 
 Return ONLY valid JSON.
 
 Schema:
 
 {
-  "subject": "",
-  "topic": "",
-  "score": null,
-  "score_type": "percentage",
-  "note": ""
+  "records": [
+    {
+      "subject": "",
+      "topic": "",
+      "score": null,
+      "score_type": "percentage",
+      "note": ""
+    }
+  ]
 }
 
-If the user did not provide a score,
-return score as null.
+Rules:
 
-Do not invent a score.
+1. Extract every topic and score explicitly provided by the user.
+
+2. If the user gives topic-wise scores, create one record
+   for each topic.
+
+Example:
+
+Biology:
+Cell Biology 55%
+Genetics 68%
+Ecology 82%
+
+Return:
+
+{
+  "records": [
+    {
+      "subject": "Biology",
+      "topic": "Cell Biology",
+      "score": 55,
+      "score_type": "percentage",
+      "note": ""
+    },
+    {
+      "subject": "Biology",
+      "topic": "Genetics",
+      "score": 68,
+      "score_type": "percentage",
+      "note": ""
+    },
+    {
+      "subject": "Biology",
+      "topic": "Ecology",
+      "score": 82,
+      "score_type": "percentage",
+      "note": ""
+    }
+  ]
+}
+
+3. If only an overall subject score is provided,
+   keep the topic as an empty string.
+
+Example:
+
+"My Biology score is 62%"
+
+Return:
+
+{
+  "records": [
+    {
+      "subject": "Biology",
+      "topic": "",
+      "score": 62,
+      "score_type": "percentage",
+      "note": ""
+    }
+  ]
+}
+
+4. Never invent topics.
+
+5. Never invent scores.
+
+6. If no score is provided, return:
+
+{
+  "records": []
+}
 """
                 },
                 {
@@ -938,9 +1010,8 @@ Do not invent a score.
             .choices[0]
             .message
             .content
+            .strip()
         )
-
-        content = content.strip()
 
         content = re.sub(
             r"^```json\s*",
@@ -962,12 +1033,16 @@ Do not invent a score.
     except Exception:
 
         return {
-            "subject": "",
-            "topic": "",
-            "score": None,
-            "score_type": "percentage",
-            "note": ""
+            "records": []
         }
+
+
+
+
+
+
+                
+          
 
 
 # ============================================================
@@ -976,11 +1051,15 @@ Do not invent a score.
 
 def save_learning_progress(
     session_id: str,
-    progress: dict
+    progress_data: dict
 ):
 
-    if progress.get("score") is None:
+    records = progress_data.get(
+        "records",
+        []
+    )
 
+    if not isinstance(records, list):
         return
 
     learning_progress.setdefault(
@@ -988,88 +1067,97 @@ def save_learning_progress(
         []
     )
 
-    new_record = {
-        "subject": progress.get(
-            "subject",
-            ""
-        ),
-        "topic": progress.get(
-            "topic",
-            ""
-        ),
-        "score": progress.get(
-            "score"
-        ),
-        "score_type": progress.get(
-            "score_type"
-        ),
-        "note": progress.get(
-            "note",
-            ""
-        )
-    }
+    for progress in records:
 
-    topic = (
-        new_record["topic"]
-        .strip()
-        .lower()
-    )
+        if progress.get("score") is None:
+            continue
 
-    subject = (
-        new_record["subject"]
-        .strip()
-        .lower()
-    )
-
-    updated = False
-
-    for index, old_record in enumerate(
-        learning_progress[session_id]
-    ):
-
-        old_topic = (
-            old_record.get(
-                "topic",
-                ""
-            )
-            .strip()
-            .lower()
-        )
-
-        old_subject = (
-            old_record.get(
+        new_record = {
+            "subject": progress.get(
                 "subject",
                 ""
+            ),
+            "topic": progress.get(
+                "topic",
+                ""
+            ),
+            "score": progress.get(
+                "score"
+            ),
+            "score_type": progress.get(
+                "score_type"
+            ),
+            "note": progress.get(
+                "note",
+                ""
             )
+        }
+
+        topic = (
+            new_record["topic"]
             .strip()
             .lower()
         )
 
-        if (
-            topic
-            and old_topic == topic
-            and old_subject == subject
+        subject = (
+            new_record["subject"]
+            .strip()
+            .lower()
+        )
+
+        updated = False
+
+        for index, old_record in enumerate(
+            learning_progress[session_id]
         ):
 
-            learning_progress[session_id][index] = (
+            old_topic = (
+                old_record.get(
+                    "topic",
+                    ""
+                )
+                .strip()
+                .lower()
+            )
+
+            old_subject = (
+                old_record.get(
+                    "subject",
+                    ""
+                )
+                .strip()
+                .lower()
+            )
+
+            if (
+                topic
+                and old_topic == topic
+                and old_subject == subject
+            ):
+
+                learning_progress[session_id][index] = (
+                    new_record
+                )
+
+                updated = True
+                break
+
+        if not updated:
+
+            learning_progress[session_id].append(
                 new_record
             )
 
-            updated = True
-
-            break
-
-    if not updated:
-
-        learning_progress[session_id].append(
-            new_record
-        )
-
-    learning_progress[session_id] = (
-        learning_progress[session_id][
+           learning_progress[session_id] = (
+           learning_progress[session_id][
             -MAX_PROGRESS_ITEMS:
         ]
     )
+
+        
+
+   
+            
 
 
 # ============================================================
