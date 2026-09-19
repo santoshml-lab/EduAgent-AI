@@ -283,12 +283,20 @@ Use this exact JSON structure:
 # Study Plan Generator
 # ========================================
 
+
 def study_plan_generator(
     subject: str,
     days: int = 7,
     hours_per_day: float = 2,
     topics: str = ""
 ):
+    """
+    Generate a grounded study-plan instruction using only
+    the topics provided by the learning-progress system.
+
+    Important:
+    This function must never invent academic subtopics.
+    """
 
     if days < 1:
         days = 1
@@ -302,20 +310,87 @@ def study_plan_generator(
     if hours_per_day > 12:
         hours_per_day = 12
 
+    # --------------------------------------------------------
+    # Parse weak-topic data
+    # --------------------------------------------------------
+
+    parsed_topics = []
+
+    try:
+        if isinstance(topics, str):
+            parsed_topics = json.loads(topics)
+        elif isinstance(topics, list):
+            parsed_topics = topics
+
+    except Exception:
+        parsed_topics = []
+
+    # --------------------------------------------------------
+    # Keep ONLY explicitly provided topics
+    # --------------------------------------------------------
+
+    grounded_topics = []
+
+    for item in parsed_topics:
+
+        if not isinstance(item, dict):
+            continue
+
+        topic = str(
+            item.get("topic", "")
+        ).strip()
+
+        score = item.get("score")
+
+        if not topic:
+            continue
+
+        grounded_topics.append(
+            {
+                "topic": topic,
+                "score": score
+            }
+        )
+
+    # --------------------------------------------------------
+    # Build grounded topic list
+    # --------------------------------------------------------
+
+    topic_names = [
+        item["topic"]
+        for item in grounded_topics
+    ]
+
+    topic_text = ", ".join(topic_names)
+
+    if topic_text:
+        instruction = (
+            f"Create a {days}-day study plan for {subject} "
+            f"with {hours_per_day} hours per day. "
+            f"Use ONLY these explicitly provided topics: "
+            f"{topic_text}. "
+            f"Do not invent or assume any subtopics."
+        )
+    else:
+        instruction = (
+            f"Create a {days}-day study plan for {subject} "
+            f"with {hours_per_day} hours per day. "
+            f"No specific weak topics were provided. "
+            f"Do not invent specific subtopics."
+        )
+
     return json.dumps(
         {
             "subject": subject,
             "days": days,
             "hours_per_day": hours_per_day,
-            "topics": topics,
-            "instruction": (
-                f"Create a {days}-day study plan "
-                f"for {subject} with "
-                f"{hours_per_day} hours per day."
-            )
+            "topics": grounded_topics,
+            "instruction": instruction
         },
         ensure_ascii=False
     )
+
+
 
 
 # ========================================
