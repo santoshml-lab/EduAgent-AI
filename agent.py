@@ -1678,6 +1678,75 @@ Use the available tools only when appropriate.
             tool_result=web_result
         )
 
+        # ----------------------------------------------------
+        # Smart Web Search Retry
+        # ----------------------------------------------------
+
+        if (
+            not web_validation.get("valid", False)
+            and web_validation.get("needs_retry", False)
+            and web_validation.get("retry_strategy") == "new_search"
+        ):
+
+            retry_trace = {
+                "step": len(tool_trace) + 1,
+                "tool": "web_search_retry",
+                "status": "running",
+                "arguments": json.dumps(
+                    {
+                        "question": standalone_question,
+                        "strategy": "new_search"
+                    },
+                    ensure_ascii=False
+                )
+            }
+
+            tool_trace.append(retry_trace)
+
+            web_result = execute_web_search(
+                standalone_question
+            )
+
+            retry_trace["status"] = (
+                "success"
+                if web_result["success"]
+                else "error"
+            )
+
+            retry_trace["result"] = web_result.get(
+                "result",
+                ""
+            )
+
+            # Validate retry result
+            web_validation = validate_tool_result(
+                question=standalone_question,
+                tool_name="web_search",
+                tool_result=web_result
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "result_validator",
+                    "status": (
+                        "success"
+                        if web_validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool": "web_search_retry"
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": web_validation
+                }
+            )
+
         tool_trace.append(
             {
                 "step": len(tool_trace) + 1,
