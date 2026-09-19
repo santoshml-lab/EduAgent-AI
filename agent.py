@@ -230,6 +230,106 @@ def execute_web_search_retry(question: str):
             "result": f"Web search retry error: {str(e)}"
         }
 
+# ============================================================
+# Helper: Detect Version Conflicts
+# ============================================================
+
+def detect_version_conflict(
+    question: str,
+    tool_result
+):
+    """
+    Deterministic sanity check for software version questions.
+
+    Prevents an older maintenance/security release from
+    being incorrectly treated as the latest feature release.
+    """
+
+    if not re.search(
+        r"\b(latest|newest|current)\b.*\b(version|release)\b"
+        r"|\b(version|release)\b.*\b(latest|newest|current)\b",
+        question,
+        re.IGNORECASE
+    ):
+        return {
+            "checked": False,
+            "conflict": False,
+            "reason": "Not a software version question."
+        }
+
+    result_text = json.dumps(
+        tool_result,
+        ensure_ascii=False
+    )
+
+    # Extract semantic versions such as:
+    # 3.14.7, 3.11.16, 4.2.1
+    versions = re.findall(
+        r"\b(\d+)\.(\d+)\.(\d+)\b",
+        result_text
+    )
+
+    if not versions:
+        return {
+            "checked": True,
+            "conflict": False,
+            "reason": "No semantic version numbers detected."
+        }
+
+    version_tuples = [
+        tuple(map(int, version))
+        for version in versions
+    ]
+
+    highest_version = max(
+        version_tuples
+    )
+
+    highest_version_text = ".".join(
+        map(str, highest_version)
+    )
+
+    # If multiple materially different versions are present,
+    # flag the result so the LLM validator cannot blindly accept
+    # an older maintenance release.
+    unique_versions = sorted(
+        set(version_tuples),
+        reverse=True
+    )
+
+    if len(unique_versions) > 1:
+
+        return {
+            "checked": True,
+            "conflict": True,
+            "reason": (
+                "Multiple software versions were found in the "
+                "retrieved result. The highest semantic version "
+                f"detected is {highest_version_text}. "
+                "The result requires careful validation to ensure "
+                "an older maintenance/security release is not "
+                "mistaken for the latest feature release."
+            ),
+            "highest_version": highest_version_text,
+            "versions_found": [
+                ".".join(map(str, version))
+                for version in unique_versions
+            ]
+        }
+
+    return {
+        "checked": True,
+        "conflict": False,
+        "reason": (
+            f"Only one semantic version was detected: "
+            f"{highest_version_text}."
+        ),
+        "highest_version": highest_version_text,
+        "versions_found": [
+            highest_version_text
+        ]
+    }
+
 
 # ============================================================
 # Helper: Validate Tool Result
