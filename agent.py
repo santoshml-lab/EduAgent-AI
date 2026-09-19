@@ -1406,25 +1406,27 @@ Use the available tools only when appropriate.
 
         for tool_call in tool_calls:
 
-            try:
-
-                arguments = json.loads(
-                    tool_call.function.arguments
-                )
-
-            except Exception:
-
-                arguments = {}
-
-            intent = arguments.get(
-                "intent"
+            tool_name = (
+                tool_call.function.name
             )
 
-            if intent:
+            if tool_name == "calculator":
+                intents.append("numerical")
 
-                intents.append(
-                    intent
-                )
+            elif tool_name == "web_search":
+                intents.append("current_information")
+
+            elif tool_name == "quiz_generator":
+                intents.append("quiz")
+
+            elif tool_name == "study_plan_generator":
+                intents.append("study_plan")
+
+            elif tool_name == "weak_topic_detector":
+                intents.append("weak_topic")
+
+            elif tool_name == "quiz_result_analyzer":
+                intents.append("quiz_result")
 
     # --------------------------------------------------------
     # Tool Execution
