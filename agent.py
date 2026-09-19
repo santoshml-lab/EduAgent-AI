@@ -2099,27 +2099,68 @@ Write the final answer.
 
     try:
 
-        final_response = client.chat.completions.create(
+    final_response = client.chat.completions.create(
 
-            model="openai/gpt-oss-20b",
+        model="openai/gpt-oss-20b",
 
-            messages=final_answer_messages,
+        messages=[
+            {
+                "role": "system",
+                "content": """
+You are the final answer generator of EduAgent AI.
 
-            temperature=0.2
-        )
+IMPORTANT:
+- Do NOT call any tools.
+- Do NOT generate tool calls.
+- Do NOT request web search.
+- Do NOT request calculator.
+- Use ONLY the information already provided in the user message.
+- Return ONLY the final natural-language answer for the user.
+- Never output JSON.
+- Never mention internal tools, routing, validation, retries,
+  agent architecture, or implementation details.
+"""
+            },
 
-        final_answer = (
-            final_response
-            .choices[0]
-            .message
-            .content
-        )
+            *conversation_history,
 
-    except Exception as e:
+            {
+                "role": "user",
+                "content": f"""
+User question:
 
-        final_answer = (
-            f"Final response error: {str(e)}"
-        )
+{standalone_question}
+
+Learning progress:
+
+{json.dumps(progress, ensure_ascii=False)}
+
+Available tool results:
+
+{json.dumps(tool_results, ensure_ascii=False)}
+
+Using ONLY the information above, write the final answer.
+"""
+            }
+        ],
+
+        temperature=0.2,
+
+        tool_choice="none"
+    )
+
+    final_answer = (
+        final_response
+        .choices[0]
+        .message
+        .content
+    )
+
+ 1 except Exception as e:
+
+    final_answer = (
+        f"Final response error: {str(e)}"
+    )
 
     # --------------------------------------------------------
     # Add Final Response To Trace
