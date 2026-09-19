@@ -1415,7 +1415,7 @@ Always choose the most relevant intent.
         )
 
             calculator_result = execute_calculator(
-            standalone_question
+              standalone_question
         )
 
         trace["status"] = (
