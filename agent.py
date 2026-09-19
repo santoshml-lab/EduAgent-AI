@@ -1273,11 +1273,11 @@ Write a concise and useful revision recommendation.
     # Router
     # --------------------------------------------------------
 
-    router_messages = [
+   router_messages = [
 
-    {
-        "role": "system",
-        "content": """
+        {
+            "role": "system",
+            "content": """
 You are the intent router for an educational AI agent.
 
 Classify the user's request into one or more of these intents:
@@ -1290,7 +1290,42 @@ Classify the user's request into one or more of these intents:
 6. weak_topic
 7. quiz_result
 
-IMPORTANT:
+IMPORTANT INTENT RULES:
+
+For numerical:
+- Use numerical when the user asks to calculate, solve, find the value of,
+  multiply, divide, add, subtract, or evaluate a mathematical expression.
+- Mathematical expressions using symbols such as:
+  +, -, *, /, ×, ÷, =, %, ^ 
+  should normally be classified as numerical when the user wants a result.
+- Examples:
+  "What is 125 * 48?"
+  "Calculate 25 + 75"
+  "Solve 12 × 8"
+  "What is 500 / 25?"
+  "Find 20% of 500"
+- These requests MUST be classified as numerical.
+
+For explanation:
+- Use explanation when the user wants a concept, definition,
+  theory, or educational explanation.
+
+For quiz:
+- Use quiz when the user asks to create, generate, give, or take a quiz.
+
+For study_plan:
+- Use study_plan when the user asks for a study schedule,
+  timetable, or study plan.
+
+For current_information:
+- Use current_information when the user asks for latest,
+  recent, current, today's information, news, or information
+  that requires web search.
+
+For weak_topic:
+- Use weak_topic when the user asks about weak topics,
+  what they should revise, what they should study,
+  or where they should focus based on learning progress.
 
 For quiz_result:
 - Only classify the request as quiz_result.
@@ -1307,18 +1342,21 @@ numerical
 current_information
 explanation
 
-Use the available tools only when appropriate.
-
 Always choose the most relevant intent.
+
+When a mathematical calculation is explicitly requested,
+prefer numerical over explanation.
+
+Use the available tools only when appropriate.
 """
-    },
+        },
 
-    *conversation_history,
+        *conversation_history,
 
-    {
-        "role": "user",
-        "content": standalone_question
-    }
+        {
+            "role": "user",
+            "content": standalone_question
+        }
 
     ]
 
@@ -1344,6 +1382,8 @@ Always choose the most relevant intent.
             "tool_trace": [],
             "sources": []
         }
+
+
 
     # --------------------------------------------------------
     # Read Router Tool Calls
