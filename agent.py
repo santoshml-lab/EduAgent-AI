@@ -1462,7 +1462,15 @@ def ask_agent(
         re.IGNORECASE
     )
 
-    if weak_topic_match:
+    if (
+        weak_topic_match
+        and not re.search(
+        r"\b(study plan|revision plan|study schedule|"
+        r"timetable|schedule|plan for \d+\s*[-]?\s*day)\b",
+        standalone_question,
+        re.IGNORECASE
+    )
+):
 
         weak_topics_result = weak_topic_detector(
             progress
