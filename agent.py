@@ -1175,9 +1175,9 @@ Write a concise and useful revision recommendation.
 
     router_messages = [
 
-        {
-            "role": "system",
-            "content": """
+    {
+        "role": "system",
+        "content": """
 You are the intent router for an educational AI agent.
 
 Classify the user's request into one or more of these intents:
@@ -1211,12 +1211,14 @@ Use the available tools only when appropriate.
 
 Always choose the most relevant intent.
 """
-        },
+    },
 
-        {
-            "role": "user",
-            "content": standalone_question
-        }
+    *conversation_history,
+
+    {
+        "role": "user",
+        "content": standalone_question
+    }
 
     ]
 
