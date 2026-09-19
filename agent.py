@@ -1759,25 +1759,22 @@ Use the available tools only when appropriate.
             )
 
             tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "result_validator",
-                    "status": (
-                        "success"
-                        if web_validation.get(
-                            "valid",
-                            False
-                        )
-                        else "rejected"
-                    ),
-                    "arguments": json.dumps(
-                        {
-                            "validated_tool": "web_search_retry"
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": web_validation
-                }
+    {
+        "step": len(tool_trace) + 1,
+        "tool": "result_validator",
+        "status": (
+            "success"
+            if web_validation.get("valid", False)
+            else "rejected"
+        ),
+        "arguments": json.dumps(
+            {
+                "validated_tool": "web_search"
+            },
+            ensure_ascii=False
+        ),
+        "result": web_validation
+    }
             )
 
         
