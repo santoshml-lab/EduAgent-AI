@@ -514,6 +514,98 @@ Validate this result.
             "needs_retry": False
         }
 
+# ============================================================
+# Helper: Create Agent Plan
+# ============================================================
+
+def create_agent_plan(question: str):
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are the planning layer of EduAgent AI.
+
+Break the user's request into the minimum number of
+logical steps required to answer it.
+
+Return ONLY valid JSON.
+
+Schema:
+
+{
+  "needs_planning": true,
+  "goal": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "",
+      "reason": ""
+    }
+  ]
+}
+
+Rules:
+
+- Use planning only when the request requires multiple
+  dependent actions.
+- Simple questions should have needs_planning = false
+  and an empty steps list.
+- Do not invent tools.
+- Do not answer the user's question.
+- Keep the plan concise.
+- Steps must be ordered logically.
+- A later step may depend on the result of an earlier step.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ],
+
+            temperature=0
+        )
+
+        content = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+        content = re.sub(
+            r"^```json\s*",
+            "",
+            content,
+            flags=re.IGNORECASE
+        )
+
+        content = re.sub(
+            r"\s*```$",
+            "",
+            content
+        )
+
+        plan = json.loads(content)
+
+        return plan
+
+    except Exception as e:
+
+        return {
+            "needs_planning": False,
+            "goal": "",
+            "steps": [],
+            "error": str(e)
+        }
+
 
 # ============================================================
 # Helper: Execute Quiz
