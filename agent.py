@@ -226,7 +226,8 @@ Return ONLY valid JSON:
 {
   "valid": true,
   "reason": "",
-  "needs_retry": false
+  "needs_retry": false,
+  retry_strategy
 }
 
 Rules:
@@ -237,6 +238,18 @@ Rules:
 - needs_retry = true only when another tool attempt
   could reasonably fix the problem.
 - Do not invent facts.
+- retry_strategy must be one of:
+  "recalculate",
+  "new_search",
+  "none"
+
+- Use "recalculate" when the calculator result
+  should be recalculated.
+
+- Use "new_search" when a web search should be
+  attempted again with a better query.
+
+- Use "none" when retry is unnecessary.
 """
                 },
                 {
