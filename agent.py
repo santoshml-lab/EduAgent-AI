@@ -1572,6 +1572,31 @@ Write a concise and useful revision recommendation.
             "sources": []
         }
 
+    # ========================================================
+    # Multi-Step Agent Planner
+    # ========================================================
+
+    plan = create_agent_plan(
+        standalone_question
+    )
+
+    planner_trace = None
+
+    if plan.get("needs_planning", False):
+
+        planner_trace = {
+            "step": 1,
+            "tool": "agent_planner",
+            "status": "success",
+            "arguments": json.dumps(
+                {
+                    "question": standalone_question
+                },
+                ensure_ascii=False
+            ),
+            "result": plan
+        }
+
     # --------------------------------------------------------
     # Router Tools
     # --------------------------------------------------------
@@ -1760,9 +1785,14 @@ Use the available tools only when appropriate.
 
     tool_trace = []
 
-    tool_results = []
+    if planner_trace:
 
-    web_sources = []
+        tool_trace.append(
+            planner_trace
+    )
+    
+
+    
 
     # --------------------------------------------------------
     # Numerical
