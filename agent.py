@@ -942,26 +942,53 @@ def ask_agent(
                     },
                     ensure_ascii=False
                 ),
-                "result": quiz_result.get(
-                    "result",
-                    ""
-                )
-            }
-        ]
+                trace["result"] = web_result.get(
+                      "result",
+                      ""
+)
 
-        answer = quiz_result.get(
-            "result",
-            ""
-        )
+# ----------------------------------------------------
+# Validate Web Search Result
+# ----------------------------------------------------
 
-        tool_trace.append(
+    web_validation = validate_tool_result(
+    question=standalone_question,
+    tool_name="web_search",
+    tool_result=web_result
+)
+
+tool_trace.append(
+    {
+        "step": len(tool_trace) + 1,
+        "tool": "result_validator",
+        "status": (
+            "success"
+            if web_validation.get(
+                "valid",
+                False
+            )
+            else "rejected"
+        ),
+        "arguments": json.dumps(
             {
-                "step": 2,
-                "tool": "final_response",
-                "status": "success",
-                "result": answer
-            }
-        )
+                "validated_tool": "web_search"
+            },
+            ensure_ascii=False
+        ),
+        "result": web_validation
+    }
+)
+
+tool_results.append(
+    {
+        "tool": "web_search",
+        "data": web_result,
+        "validation": web_validation
+    }
+)
+                    
+                    
+                
 
         # ----------------------------------------------------
         # Save Conversation Memory
