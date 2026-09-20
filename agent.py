@@ -927,7 +927,10 @@ def execute_study_plan(
         days=days,
         hours_per_day=hours_per_day,
         topics=previous_result
-         )
+        )
+        
+        
+         
             
             
 
