@@ -2046,23 +2046,48 @@ Use tools only when appropriate.
 
                 web_sources = []
 
-    # ========================================================
-    # Normal Tool Execution
-    # ========================================================
     # --------------------------------------------------------
-    # Numerical
-    # --------------------------------------------------------
+# Numerical
+# --------------------------------------------------------
 
-    if (
-        "numerical" in intents
-       and "calculator" not in planned_tools
-  ):
+if (
+    "numerical" in intents
+    and "calculator" not in planned_tools
+):
+
+    # ====================================================
+    # First Calculator Attempt
+    # ====================================================
 
     calculator_result = execute_calculator(
         standalone_question
     )
 
-    # trace
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "calculator",
+            "status": (
+                "success"
+                if calculator_result["success"]
+                else "error"
+            ),
+            "arguments": json.dumps(
+                {
+                    "question": standalone_question
+                },
+                ensure_ascii=False
+            ),
+            "result": calculator_result.get(
+                "result",
+                ""
+            )
+        }
+    )
+
+    # ====================================================
+    # Validate Calculator Result
+    # ====================================================
 
     validation_result = validate_tool_result(
         question=standalone_question,
@@ -2070,19 +2095,82 @@ Use tools only when appropriate.
         tool_result=calculator_result
     )
 
-    # trace
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "result_validator",
+            "status": (
+                "success"
+                if validation_result.get(
+                    "valid",
+                    False
+                )
+                else "rejected"
+            ),
+            "arguments": json.dumps(
+                {
+                    "validated_tool": "calculator"
+                },
+                ensure_ascii=False
+            ),
+            "result": validation_result
+        }
+    )
+
+    # ====================================================
+    # Calculator Recovery / Recalculation
+    # ====================================================
 
     if (
-        not validation_result.get("valid", False)
-        and validation_result.get("needs_retry", False)
-        and validation_result.get("retry_strategy") == "recalculate"
+        not validation_result.get(
+            "valid",
+            False
+        )
+        and validation_result.get(
+            "needs_retry",
+            False
+        )
+        and validation_result.get(
+            "retry_strategy"
+        ) == "recalculate"
     ):
 
-        calculator_retry_result = execute_calculator_retry(
-            standalone_question
+        calculator_retry_result = (
+            execute_calculator_retry(
+                standalone_question
+            )
         )
 
-        # retry trace
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "calculator_retry",
+                "status": (
+                    "success"
+                    if calculator_retry_result[
+                        "success"
+                    ]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question": standalone_question,
+                        "retry": True,
+                        "strategy": "recalculate"
+                    },
+                    ensure_ascii=False
+                ),
+                "result":
+                    calculator_retry_result.get(
+                        "result",
+                        ""
+                    )
+            }
+        )
+
+        # ----------------------------------------------
+        # Validate Retry Result
+        # ----------------------------------------------
 
         retry_validation = validate_tool_result(
             question=standalone_question,
@@ -2090,20 +2178,52 @@ Use tools only when appropriate.
             tool_result=calculator_retry_result
         )
 
-        # retry validation trace
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool":
+                    "result_validator_retry",
+                "status": (
+                    "success"
+                    if retry_validation.get(
+                        "valid",
+                        False
+                    )
+                    else "rejected"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "validated_tool":
+                            "calculator_retry"
+                    },
+                    ensure_ascii=False
+                ),
+                "result": retry_validation
+            }
+        )
 
-        if retry_validation.get("valid", False):
+        if retry_validation.get(
+            "valid",
+            False
+        ):
 
-            calculator_result = calculator_retry_result
-            validation_result = retry_validation
+            calculator_result = (
+                calculator_retry_result
+            )
+
+            validation_result = (
+                retry_validation
+            )
 
     tool_results.append(
         {
             "tool": "calculator",
             "data": calculator_result,
-            "validation": validation_result
+            "validation":
+                validation_result
         }
     )
+    
 
 
 
