@@ -589,6 +589,111 @@ from Step 1.
             "error": str(e)
         }
 
+# ============================================================
+# Agent Result Validator
+# ============================================================
+
+def validate_agent_step(question, step, tool_result):
+    """
+    Decide whether the executed tool result is sufficient
+    or whether another agent step is required.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are the validation layer of EduAgent AI.
+
+Your job is to inspect the result of ONE executed agent step.
+
+Return ONLY valid JSON.
+
+Schema:
+
+{
+  "valid": true,
+  "needs_next_step": false,
+  "reason": "",
+  "next_action": ""
+}
+
+Rules:
+
+1. valid = true when the tool result correctly addresses
+   the executed step.
+
+2. needs_next_step = true ONLY when another tool is genuinely
+   required to complete the user's original request.
+
+3. Do not invent missing information.
+
+4. Do not create academic topics that the user did not provide.
+
+5. If the result is sufficient for the current step but the
+   original request still requires a later planned step,
+   needs_next_step can be true.
+
+6. If no additional tool is required, needs_next_step=false.
+
+7. next_action must describe the required next action briefly.
+
+8. Do not answer the user's original question.
+
+9. Do not mention internal implementation details.
+"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+Original user question:
+{question}
+
+Executed step:
+{json.dumps(step, ensure_ascii=False)}
+
+Tool result:
+{json.dumps(tool_result, ensure_ascii=False)}
+"""
+                }
+            ],
+            temperature=0
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        # Remove accidental markdown fences
+        raw = re.sub(
+            r"^```(?:json)?\s*|\s*```$",
+            "",
+            raw,
+            flags=re.IGNORECASE
+        ).strip()
+
+        result = json.loads(raw)
+
+        return {
+            "valid": bool(result.get("valid", False)),
+            "needs_next_step": bool(
+                result.get("needs_next_step", False)
+            ),
+            "reason": str(result.get("reason", "")),
+            "next_action": str(
+                result.get("next_action", "")
+            )
+        }
+
+    except Exception as e:
+        return {
+            "valid": False,
+            "needs_next_step": False,
+            "reason": f"Validation error: {str(e)}",
+            "next_action": ""
+        }
+
 
 # ============================================================
 # Helper: Execute Quiz
