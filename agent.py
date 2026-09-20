@@ -639,106 +639,166 @@ from Step 1.
 # Agent Result Validator
 # ============================================================
 
-def validate_agent_step(question, step, tool_result):
+def validate_agent_step(
+    question: str,
+    step: dict,
+    tool_result: dict
+):
     """
-    Decide whether the executed tool result is sufficient
-    or whether another agent step is required.
+    Validate whether an executed agent step actually
+    satisfies the planned step and remains grounded
+    in the original user request.
     """
 
+    tool_name = step.get("tool", "")
+    planned_action = step.get("action", "")
+    planned_reason = step.get("reason", "")
+
+    tool_output = tool_result.get(
+        "result",
+        ""
+    )
+
+    validation_prompt = f"""
+You are validating one executed step of an agentic AI system.
+
+Original user request:
+{question}
+
+Planned step:
+Tool: {tool_name}
+Action: {planned_action}
+Reason: {planned_reason}
+
+Actual tool result:
+{tool_output}
+
+Your job is to determine whether the actual tool result
+is valid for this exact planned step.
+
+IMPORTANT VALIDATION RULES:
+
+1. The result must directly address the planned action.
+
+2. Do not accept a result merely because it is well formatted.
+
+3. Check grounding against the ORIGINAL user request.
+
+4. If the user explicitly provides a subject, preserve it.
+   Example:
+   User says Physics.
+   A result saying General Studies is NOT grounded.
+
+5. If the user explicitly provides a number of days,
+   the result must use that exact number of days.
+
+6. If the user explicitly provides hours per day,
+   the result must use that exact value.
+
+7. If a previous agent step produced data required by
+   the current step, the current result must actually
+   use that data.
+
+8. Do not allow invented academic topics.
+
+9. Do not allow missing required information.
+
+10. If the result is incomplete, contradictory, or
+    insufficient for the planned action, reject it.
+
+11. needs_next_step should be true only when another
+    planned step is genuinely required OR the current
+    result is valid but the original request still has
+    a remaining planned step.
+
+Return ONLY valid JSON:
+
+{{
+  "valid": true,
+  "needs_next_step": false,
+  "reason": "",
+  "next_action": ""
+}}
+
+If invalid:
+
+{{
+  "valid": false,
+  "needs_next_step": false,
+  "reason": "Explain the exact grounding or validation failure.",
+  "next_action": "Describe what must be corrected."
+}}
+
+Do not answer the user's original question.
+Do not invent missing information.
+"""
+
     try:
+
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
                 {
                     "role": "system",
-                    "content": """
-You are the validation layer of EduAgent AI.
-
-Your job is to inspect the result of ONE executed agent step.
-
-Return ONLY valid JSON.
-
-Schema:
-
-{
-  "valid": true,
-  "needs_next_step": false,
-  "reason": "",
-  "next_action": ""
-}
-
-Rules:
-
-1. valid = true when the tool result correctly addresses
-   the executed step.
-
-2. needs_next_step = true ONLY when another tool is genuinely
-   required to complete the user's original request.
-
-3. Do not invent missing information.
-
-4. Do not create academic topics that the user did not provide.
-
-5. If the result is sufficient for the current step but the
-   original request still requires a later planned step,
-   needs_next_step can be true.
-
-6. If no additional tool is required, needs_next_step=false.
-
-7. next_action must describe the required next action briefly.
-
-8. Do not answer the user's original question.
-
-9. Do not mention internal implementation details.
-"""
+                    "content": (
+                        "You are a strict agent-step validator. "
+                        "Return only valid JSON."
+                    )
                 },
                 {
                     "role": "user",
-                    "content": f"""
-Original user question:
-{question}
-
-Executed step:
-{json.dumps(step, ensure_ascii=False)}
-
-Tool result:
-{json.dumps(tool_result, ensure_ascii=False)}
-"""
+                    "content": validation_prompt
                 }
             ],
             temperature=0
         )
 
-        raw = response.choices[0].message.content.strip()
+        content = response.choices[0].message.content.strip()
 
-        # Remove accidental markdown fences
-        raw = re.sub(
-            r"^```(?:json)?\s*|\s*```$",
+        content = re.sub(
+            r"^```json\s*|\s*```$",
             "",
-            raw,
+            content,
             flags=re.IGNORECASE
         ).strip()
 
-        result = json.loads(raw)
+        validation = json.loads(content)
 
         return {
-            "valid": bool(result.get("valid", False)),
-            "needs_next_step": bool(
-                result.get("needs_next_step", False)
+            "valid": bool(
+                validation.get(
+                    "valid",
+                    False
+                )
             ),
-            "reason": str(result.get("reason", "")),
-            "next_action": str(
-                result.get("next_action", "")
+            "needs_next_step": bool(
+                validation.get(
+                    "needs_next_step",
+                    False
+                )
+            ),
+            "reason": validation.get(
+                "reason",
+                ""
+            ),
+            "next_action": validation.get(
+                "next_action",
+                ""
             )
         }
 
     except Exception as e:
+
         return {
             "valid": False,
             "needs_next_step": False,
-            "reason": f"Validation error: {str(e)}",
-            "next_action": ""
+            "reason": (
+                f"Validator error: {str(e)}"
+            ),
+            "next_action": "Retry validation."
         }
+
+            
 
 
 # ============================================================
