@@ -1699,6 +1699,75 @@ def ask_agent(
             )
 
             # ----------------------------------------------------
+# Study Plan Recovery / Retry
+# ----------------------------------------------------
+
+if (
+    tool_name == "study_plan_generator"
+    and not validation.get("valid", False)
+):
+
+    retry_result = execute_study_plan(
+        standalone_question,
+        previous_result
+    )
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "study_plan_retry",
+            "status": (
+                "success"
+                if retry_result.get("success", False)
+                else "error"
+            ),
+            "arguments": json.dumps(
+                {
+                    "question": standalone_question,
+                    "retry": True,
+                    "strategy": "regenerate_study_plan"
+                },
+                ensure_ascii=False
+            ),
+            "result": retry_result.get(
+                "result",
+                ""
+            )
+        }
+    )
+
+    retry_validation = validate_agent_step(
+        question=standalone_question,
+        step=step,
+        tool_result=retry_result
+    )
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "agent_validator_retry",
+            "status": (
+                "success"
+                if retry_validation.get("valid", False)
+                else "rejected"
+            ),
+            "arguments": json.dumps(
+                {
+                    "validated_tool":
+                        "study_plan_retry"
+                },
+                ensure_ascii=False
+            ),
+            "result": retry_validation
+        }
+    )
+
+    if retry_validation.get("valid", False):
+
+        result = retry_result
+        validation = retry_validation
+
+            # ----------------------------------------------------
             # Force planner continuation based on
             # remaining planned steps
             # ----------------------------------------------------
