@@ -877,7 +877,10 @@ def execute_quiz(question: str):
 # Helper: Execute Study Plan
 # ============================================================
 
-def execute_study_plan(question: str):
+def execute_study_plan(
+    question: str,
+    previous_result: str = ""
+):
 
     try:
 
