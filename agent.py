@@ -1563,7 +1563,6 @@ def ask_agent(
     ]
 
     router_messages = [
-
         {
             "role": "system",
             "content": """
@@ -1614,15 +1613,10 @@ Use tools only when appropriate.
     try:
 
         router_response = client.chat.completions.create(
-
             model="openai/gpt-oss-20b",
-
             messages=router_messages,
-
             tools=router_tools,
-
             tool_choice="auto",
-
             temperature=0
         )
 
@@ -1652,49 +1646,29 @@ Use tools only when appropriate.
             )
 
             if tool_name == "calculator":
-
-                intents.append(
-                    "numerical"
-                )
+                intents.append("numerical")
 
             elif tool_name == "web_search":
-
-                intents.append(
-                    "current_information"
-                )
+                intents.append("current_information")
 
             elif tool_name == "quiz_generator":
-
-                intents.append(
-                    "quiz"
-                )
+                intents.append("quiz")
 
             elif tool_name == "study_plan_generator":
-
-                intents.append(
-                    "study_plan"
-                )
+                intents.append("study_plan")
 
             elif tool_name == "weak_topic_detector":
-
-                intents.append(
-                    "weak_topic"
-                )
+                intents.append("weak_topic")
 
             elif tool_name == "quiz_result_analyzer":
-
-                intents.append(
-                    "quiz_result"
-                )
-
-    # Remove duplicates while preserving order
+                intents.append("quiz_result")
 
     intents = list(
         dict.fromkeys(intents)
     )
 
     # ========================================================
-    # Tool Execution
+    # Initialize Agent State
     # ========================================================
 
     tool_trace = []
@@ -1708,153 +1682,408 @@ Use tools only when appropriate.
         )
 
     # ========================================================
-    # Execute Planned Steps
+    # Planned Agent Execution
     # ========================================================
 
-    planned_tools = set()
+    planned_steps = []
 
     if plan.get(
         "needs_planning",
         False
     ):
 
-        weak_result = None
-
-        for planned_step in plan.get(
+        planned_steps = plan.get(
             "steps",
             []
-        ):
+        )
 
-            planned_tool = planned_step.get(
-                "tool"
-            )
+    planned_tools = {
+        step.get("tool")
+        for step in planned_steps
+        if step.get("tool")
+    }
 
-            planned_tools.add(
-                planned_tool
-            )
-
-            # ------------------------------------------------
-            # Weak Topic Detector
-            # ------------------------------------------------
-
-            if planned_tool == "weak_topic_detector":
-
-                weak_result = weak_topic_detector(
-                    progress
-                )
-
-                tool_results.append(
-                    {
-                        "tool": "weak_topic_detector",
-                        "result": weak_result
-                    }
-                )
-
-                tool_trace.append(
-                    {
-                        "step": len(tool_trace) + 1,
-                        "tool": "weak_topic_detector",
-                        "status": "success",
-                        "arguments": json.dumps(
-                            {
-                                "progress_items": len(progress)
-                            },
-                            ensure_ascii=False
-                        ),
-                        "result": weak_result
-                    }
-                )
-
-            # ------------------------------------------------
-            # Study Plan Generator
-            # ------------------------------------------------
-
-            elif planned_tool == "study_plan_generator":
-
-                subject = plan.get(
-                    "subject",
-                    "General Studies"
-                )
-
-                days = plan.get(
-                    "days",
-                    7
-                )
-
-                hours_per_day = plan.get(
-                    "hours_per_day",
-                    1
-                )
-
-                plan_result = study_plan_generator(
-                    subject=subject,
-                    days=days,
-                    hours_per_day=hours_per_day,
-                    topics=weak_result
-                )
-
-                tool_results.append(
-                    {
-                        "tool": "study_plan_generator",
-                        "result": plan_result
-                    }
-                )
-
-                tool_trace.append(
-                    {
-                        "step": len(tool_trace) + 1,
-                        "tool": "study_plan_generator",
-                        "status": "success",
-                        "arguments": json.dumps(
-                            {
-                                "subject": subject,
-                                "days": days,
-                                "hours_per_day": hours_per_day
-                            },
-                            ensure_ascii=False
-                        ),
-                        "result": plan_result
-                    }
-                )
+    weak_result = None
 
     # ========================================================
+    # Execute Planned Steps One-by-One
+    # ========================================================
+
+    for index, planned_step in enumerate(
+        planned_steps
+    ):
+
+        planned_tool = planned_step.get(
+            "tool"
+        )
+
+        # ----------------------------------------------------
+        # Weak Topic Detector
+        # ----------------------------------------------------
+
+        if planned_tool == "weak_topic_detector":
+
+            weak_result = weak_topic_detector(
+                progress
+            )
+
+            tool_results.append(
+                {
+                    "tool": "weak_topic_detector",
+                    "result": weak_result
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "weak_topic_detector",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "progress_items": len(progress)
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": weak_result
+                }
+            )
+
+            # ----------------------------------------------
+            # Validate Step
+            # ----------------------------------------------
+
+            validation = validate_agent_step(
+                question=standalone_question,
+                step=planned_step,
+                tool_result=weak_result
+            )
+
+            # ------------------------------------------------
+            # Determine Remaining Planned Steps
+            # ------------------------------------------------
+
+            remaining_steps = planned_steps[
+                index + 1:
+            ]
+
+            needs_next_step = (
+                len(remaining_steps) > 0
+            )
+
+            validation["needs_next_step"] = (
+                needs_next_step
+            )
+
+            if needs_next_step:
+
+                validation["reason"] = (
+                    validation.get(
+                        "reason",
+                        ""
+                    )
+                    + " "
+                    + "The planner has another required step."
+                )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "agent_validator",
+                    "status": (
+                        "success"
+                        if validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool":
+                                "weak_topic_detector",
+                            "planned_step":
+                                planned_step
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": validation
+                }
+            )
+
+            # ----------------------------------------------
+            # Stop if validation fails
+            # ----------------------------------------------
+
+            if not validation.get(
+                "valid",
+                False
+            ):
+
+                break
+
+        # ----------------------------------------------------
+        # Study Plan Generator
+        # ----------------------------------------------------
+
+        elif planned_tool == "study_plan_generator":
+
+            subject = plan.get(
+                "subject",
+                "General Studies"
+            )
+
+            days = plan.get(
+                "days",
+                7
+            )
+
+            hours_per_day = plan.get(
+                "hours_per_day",
+                1
+            )
+
+            plan_result = study_plan_generator(
+                subject=subject,
+                days=days,
+                hours_per_day=hours_per_day,
+                topics=weak_result
+            )
+
+            tool_results.append(
+                {
+                    "tool": "study_plan_generator",
+                    "result": plan_result
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "study_plan_generator",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "subject": subject,
+                            "days": days,
+                            "hours_per_day":
+                                hours_per_day,
+                            "topics_from_previous_step":
+                                weak_result is not None
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": plan_result
+                }
+            )
+
+            # ----------------------------------------------
+            # Validate Study Plan
+            # ----------------------------------------------
+
+            validation = validate_agent_step(
+                question=standalone_question,
+                step=planned_step,
+                tool_result=plan_result
+            )
+
+            remaining_steps = planned_steps[
+                index + 1:
+            ]
+
+            needs_next_step = (
+                len(remaining_steps) > 0
+            )
+
+            validation["needs_next_step"] = (
+                needs_next_step
+            )
+
+            if needs_next_step:
+
+                validation["reason"] = (
+                    validation.get(
+                        "reason",
+                        ""
+                    )
+                    + " "
+                    + "The planner has another required step."
+                )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "agent_validator",
+                    "status": (
+                        "success"
+                        if validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool":
+                                "study_plan_generator",
+                            "planned_step":
+                                planned_step
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": validation
+                }
+            )
+
+            if not validation.get(
+                "valid",
+                False
+            ):
+
+                break
+
+        # ----------------------------------------------------
+        # Planned Web Search
+        # ----------------------------------------------------
+
+        elif planned_tool == "web_search":
+
+            web_result = execute_web_search(
+                standalone_question
+            )
+
+            tool_results.append(
+                {
+                    "tool": "web_search",
+                    "data": web_result
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "web_search",
+                    "status": (
+                        "success"
+                        if web_result["success"]
+                        else "error"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "question":
+                                standalone_question
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": web_result.get(
+                        "result",
+                        ""
+                    )
+                }
+            )
+
+            validation = validate_agent_step(
+                question=standalone_question,
+                step=planned_step,
+                tool_result=web_result
+            )
+
+            remaining_steps = planned_steps[
+                index + 1:
+            ]
+
+            validation["needs_next_step"] = (
+                len(remaining_steps) > 0
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "agent_validator",
+                    "status": (
+                        "success"
+                        if validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool":
+                                "web_search"
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": validation
+                }
+            )
+
+            if not validation.get(
+                "valid",
+                False
+            ):
+
+                break
+
+            try:
+
+                parsed_sources = json.loads(
+                    web_result.get(
+                        "result",
+                        "[]"
+                    )
+                )
+
+                if isinstance(
+                    parsed_sources,
+                    list
+                ):
+
+                    web_sources = parsed_sources
+
+            except Exception:
+
+                web_sources = []
+
+    # ========================================================
+    # Normal Tool Execution
+    # ========================================================
+
+    # --------------------------------------------------------
     # Numerical
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         "numerical" in intents
         and "calculator" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "calculator",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         calculator_result = execute_calculator(
             standalone_question
         )
 
-        trace["status"] = (
-            "success"
-            if calculator_result["success"]
-            else "error"
-        )
-
-        trace["result"] = calculator_result.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "calculator",
+                "status": (
+                    "success"
+                    if calculator_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question":
+                            standalone_question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": calculator_result.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         validation_result = validate_tool_result(
@@ -1877,87 +2106,14 @@ Use tools only when appropriate.
                 ),
                 "arguments": json.dumps(
                     {
-                        "validated_tool": "calculator"
+                        "validated_tool":
+                            "calculator"
                     },
                     ensure_ascii=False
                 ),
                 "result": validation_result
             }
         )
-
-        if (
-            not validation_result.get(
-                "valid",
-                False
-            )
-            and validation_result.get(
-                "needs_retry",
-                False
-            )
-            and validation_result.get(
-                "retry_strategy"
-            ) == "recalculate"
-        ):
-
-            retry_result = execute_calculator(
-                standalone_question
-            )
-
-            retry_validation = validate_tool_result(
-                question=standalone_question,
-                tool_name="calculator_retry",
-                tool_result=retry_result
-            )
-
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "calculator_retry",
-                    "status": (
-                        "success"
-                        if retry_result["success"]
-                        else "error"
-                    ),
-                    "arguments": json.dumps(
-                        {
-                            "question": standalone_question,
-                            "retry": True
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": retry_result.get(
-                        "result",
-                        ""
-                    )
-                }
-            )
-
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "result_validator_retry",
-                    "status": (
-                        "success"
-                        if retry_validation.get(
-                            "valid",
-                            False
-                        )
-                        else "rejected"
-                    ),
-                    "arguments": json.dumps(
-                        {
-                            "validated_tool":
-                                "calculator_retry"
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": retry_validation
-                }
-            )
-
-            calculator_result = retry_result
-
-            validation_result = retry_validation
 
         tool_results.append(
             {
@@ -1967,44 +2123,40 @@ Use tools only when appropriate.
             }
         )
 
-    # ========================================================
+    # --------------------------------------------------------
     # Current Information
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         "current_information" in intents
         and "web_search" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "web_search",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         web_result = execute_web_search(
             standalone_question
         )
 
-        trace["status"] = (
-            "success"
-            if web_result["success"]
-            else "error"
-        )
-
-        trace["result"] = web_result.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "web_search",
+                "status": (
+                    "success"
+                    if web_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question":
+                            standalone_question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": web_result.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         web_validation = validate_tool_result(
@@ -2047,7 +2199,8 @@ Use tools only when appropriate.
                 ),
                 "arguments": json.dumps(
                     {
-                        "validated_tool": "web_search"
+                        "validated_tool":
+                            "web_search"
                     },
                     ensure_ascii=False
                 ),
@@ -2069,47 +2222,45 @@ Use tools only when appropriate.
             ) == "new_search"
         ):
 
-            retry_trace = {
-                "step": len(tool_trace) + 1,
-                "tool": "web_search_retry",
-                "status": "running",
-                "arguments": json.dumps(
-                    {
-                        "question": standalone_question
-                    },
-                    ensure_ascii=False
-                )
-            }
-
-            tool_trace.append(
-                retry_trace
-            )
-
             web_result = execute_web_search_retry(
                 standalone_question
             )
 
-            retry_trace["status"] = (
-                "success"
-                if web_result["success"]
-                else "error"
-            )
-
-            retry_trace["result"] = web_result.get(
-                "result",
-                ""
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "web_search_retry",
+                    "status": (
+                        "success"
+                        if web_result["success"]
+                        else "error"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "question":
+                                standalone_question,
+                            "retry": True
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": web_result.get(
+                        "result",
+                        ""
+                    )
+                }
             )
 
             web_validation = validate_tool_result(
                 question=standalone_question,
-                tool_name="web_search",
+                tool_name="web_search_retry",
                 tool_result=web_result
             )
 
             tool_trace.append(
                 {
                     "step": len(tool_trace) + 1,
-                    "tool": "result_validator_retry",
+                    "tool":
+                        "result_validator_retry",
                     "status": (
                         "success"
                         if web_validation.get(
@@ -2120,7 +2271,8 @@ Use tools only when appropriate.
                     ),
                     "arguments": json.dumps(
                         {
-                            "validated_tool": "web_search"
+                            "validated_tool":
+                                "web_search_retry"
                         },
                         ensure_ascii=False
                     ),
@@ -2156,44 +2308,40 @@ Use tools only when appropriate.
 
             web_sources = []
 
-    # ========================================================
+    # --------------------------------------------------------
     # Quiz
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         "quiz" in intents
         and "quiz_generator" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "quiz_generator",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         quiz_result = execute_quiz(
             standalone_question
         )
 
-        trace["status"] = (
-            "success"
-            if quiz_result["success"]
-            else "error"
-        )
-
-        trace["result"] = quiz_result.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "quiz_generator",
+                "status": (
+                    "success"
+                    if quiz_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question":
+                            standalone_question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": quiz_result.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         tool_results.append(
@@ -2203,44 +2351,40 @@ Use tools only when appropriate.
             }
         )
 
-    # ========================================================
-    # Study Plan
-    # ========================================================
+    # --------------------------------------------------------
+    # Normal Study Plan
+    # --------------------------------------------------------
 
     if (
         "study_plan" in intents
         and "study_plan_generator" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "study_plan_generator",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         study_plan_result = execute_study_plan(
             standalone_question
         )
 
-        trace["status"] = (
-            "success"
-            if study_plan_result["success"]
-            else "error"
-        )
-
-        trace["result"] = study_plan_result.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "study_plan_generator",
+                "status": (
+                    "success"
+                    if study_plan_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question":
+                            standalone_question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": study_plan_result.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         tool_results.append(
@@ -2250,87 +2394,80 @@ Use tools only when appropriate.
             }
         )
 
-    # ========================================================
-    # Weak Topic Detector
-    # ========================================================
+    # --------------------------------------------------------
+    # Normal Weak Topic
+    # --------------------------------------------------------
 
     if (
         "weak_topic" in intents
         and "weak_topic_detector" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "weak_topic_detector",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "progress_items": len(progress)
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         weak_topics_result = weak_topic_detector(
             progress
         )
 
-        trace["status"] = "success"
-
-        trace["result"] = weak_topics_result
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "weak_topic_detector",
+                "status": "success",
+                "arguments": json.dumps(
+                    {
+                        "progress_items":
+                            len(progress)
+                    },
+                    ensure_ascii=False
+                ),
+                "result": weak_topics_result
+            }
+        )
 
         tool_results.append(
             {
                 "tool": "weak_topic_detector",
                 "data": {
                     "success": True,
-                    "result": weak_topics_result
+                    "result":
+                        weak_topics_result
                 }
             }
         )
 
-    # ========================================================
+    # --------------------------------------------------------
     # Targeted Revision
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         "weak_topic" in intents
         and "weak_topic_detector" not in planned_tools
     ):
 
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "targeted_revision",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "progress_items": len(progress)
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
-
         revision_result = generate_targeted_revision(
             progress
         )
 
-        trace["status"] = (
-            "success"
-            if revision_result["success"]
-            else "error"
-        )
-
-        trace["result"] = revision_result.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool": "targeted_revision",
+                "status": (
+                    "success"
+                    if revision_result["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "progress_items":
+                            len(progress)
+                    },
+                    ensure_ascii=False
+                ),
+                "result": revision_result.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         tool_results.append(
@@ -2340,47 +2477,46 @@ Use tools only when appropriate.
             }
         )
 
-    # ========================================================
+    # --------------------------------------------------------
     # Quiz Result Analyzer
-    # ========================================================
+    # --------------------------------------------------------
 
     if "quiz_result" in intents:
-
-        trace = {
-            "step": len(tool_trace) + 1,
-            "tool": "quiz_result_analyzer",
-            "status": "running",
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question
-                },
-                ensure_ascii=False
-            )
-        }
-
-        tool_trace.append(
-            trace
-        )
 
         quiz_result_analysis = execute_quiz_result(
             standalone_question
         )
 
-        trace["status"] = (
-            "success"
-            if quiz_result_analysis["success"]
-            else "error"
-        )
-
-        trace["result"] = quiz_result_analysis.get(
-            "result",
-            ""
+        tool_trace.append(
+            {
+                "step": len(tool_trace) + 1,
+                "tool":
+                    "quiz_result_analyzer",
+                "status": (
+                    "success"
+                    if quiz_result_analysis["success"]
+                    else "error"
+                ),
+                "arguments": json.dumps(
+                    {
+                        "question":
+                            standalone_question
+                    },
+                    ensure_ascii=False
+                ),
+                "result": quiz_result_analysis.get(
+                    "result",
+                    ""
+                )
+            }
         )
 
         tool_results.append(
             {
-                "tool": "quiz_result_analyzer",
-                "data": quiz_result_analysis
+                "tool":
+                    "quiz_result_analyzer",
+                "data":
+                    quiz_result_analysis
             }
         )
 
@@ -2409,7 +2545,7 @@ Use tools only when appropriate.
     )
 
     # ========================================================
-    # Save Conversation Memory
+    # Save Conversation
     # ========================================================
 
     save_conversation(
@@ -2426,7 +2562,35 @@ Use tools only when appropriate.
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
-    }
+        }
+
+
+
+
+      
+                    
+                
+        
+        
+                
+
+            
+                    
+                    
+                        
+     
+        
+                
+            
+            
+
+        
+        
+
+        
+                
+        
+        
 
 
 # ============================================================
