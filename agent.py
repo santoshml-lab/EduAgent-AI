@@ -2847,36 +2847,39 @@ Using ONLY the information above, write the final answer.
     )
 
     # --------------------------------------------------------
-    # Save Conversation Memory
-    # --------------------------------------------------------
+# Save Conversation Memory
+# --------------------------------------------------------
 
-    conversation_memory.setdefault(
-        session_id,
-        []
-    )
+conversation_memory.setdefault(
+    session_id,
+    []
+)
 
-    conversation_memory[session_id].append(
-        {
-            "user": question,
-            "assistant": final_answer
-        }
-    )
-
-    conversation_memory[session_id] = (
-        conversation_memory[session_id][
-            -MAX_HISTORY:
-        ]
-    )
-
-    # --------------------------------------------------------
-    # Final Return
-    # --------------------------------------------------------
-
-      return {
-        "answer": final_answer,
-        "tool_trace": tool_trace,
-        "sources": web_sources
+conversation_memory[session_id].append(
+    {
+        "user": question,
+        "assistant": final_answer
     }
+)
+
+conversation_memory[session_id] = (
+    conversation_memory[session_id][
+        -MAX_HISTORY:
+    ]
+)
+
+# --------------------------------------------------------
+# Final Return
+# --------------------------------------------------------
+
+return {
+    "answer": final_answer,
+    "tool_trace": tool_trace,
+    "sources": web_sources
+}
+    
+
+    
                 
 
 
