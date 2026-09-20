@@ -1624,16 +1624,16 @@ def ask_agent(
                 previous_result = ""
 
                 if tool_results:
+                  previous_result = (
+                  tool_results[-1]
+                  .get("data", {})
+                  .get("result", "")
+    )
 
-                    previous_result = json.dumps(
-                        tool_results[-1],
-                        ensure_ascii=False
-                    )
-
-                result = execute_study_plan(
-                    standalone_question,
-                    previous_result
-                )
+                  result = execute_study_plan(
+                  standalone_question,
+                  previous_result
+)
 
             # ----------------------------------------------------
             # Web Search
