@@ -2504,8 +2504,17 @@ Choose the minimum required tool.
 
     final_answer = generate_final_answer(
     question=standalone_question,
-    tool_results=tool_results
+    tool_results=tool_results,
+    progress=learning_progress.get(
+        session_id,
+        []
+    ),
+    conversation_history=conversation_memory.get(
+        session_id,
+        []
     )
+    )
+    
         
             
 
