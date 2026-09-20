@@ -1929,118 +1929,201 @@ Use the available tools only when appropriate.
     )
 
     # --------------------------------------------------------
-    # Execute Planned Steps
-    # --------------------------------------------------------
+# Execute Planned Steps
+# --------------------------------------------------------
 
-    if plan.get("needs_planning", False):
+if plan.get("needs_planning", False):
 
-        for planned_step in plan.get("steps", []):
+    weak_result = None
 
-            planned_tool = planned_step.get("tool")
+    for planned_step in plan.get("steps", []):
 
-            if planned_tool == "weak_topic_detector":
+        planned_tool = planned_step.get("tool")
 
-                weak_result = weak_topic_detector(
-                    progress
-                )
+        # ----------------------------------------------------
+        # Step: Weak Topic Detector
+        # ----------------------------------------------------
 
-                tool_results.append(
-                    {
-                        "tool": "weak_topic_detector",
-                        "result": weak_result
-                    }
-                )
+        if planned_tool == "weak_topic_detector":
 
-                tool_trace.append(
-                    {
-                        "step": len(tool_trace) + 1,
-                        "tool": "weak_topic_detector",
-                        "status": "success",
-                        "arguments": json.dumps(
-                            {
-                                "progress_items": len(progress)
-                            },
-                            ensure_ascii=False
-                        ),
-                        "result": weak_result
-                    }
-                )
+            weak_result = weak_topic_detector(
+                progress
+            )
 
-            elif planned_tool == "study_plan_generator":
+            tool_results.append(
+                {
+                    "tool": "weak_topic_detector",
+                    "result": weak_result
+                }
+            )
 
-                 subject = plan.get(
-                 "subject",
-                 "General Studies"
-    )
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "weak_topic_detector",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "progress_items": len(progress)
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": weak_result
+                }
+            )
 
-                days = plan.get(
+        # --------------------------------------------------------
+# Execute Planned Steps
+# --------------------------------------------------------
+
+if plan.get("needs_planning", False):
+
+    weak_result = None
+
+    for planned_step in plan.get("steps", []):
+
+        planned_tool = planned_step.get("tool")
+
+        # ----------------------------------------------------
+        # Step: Weak Topic Detector
+        # ----------------------------------------------------
+
+        if planned_tool == "weak_topic_detector":
+
+            weak_result = weak_topic_detector(
+                progress
+            )
+
+            tool_results.append(
+                {
+                    "tool": "weak_topic_detector",
+                    "result": weak_result
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "weak_topic_detector",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "progress_items": len(progress)
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": weak_result
+                }
+            )
+
+        # ----------------------------------------------------
+        # Step: Study Plan Generator
+        # ----------------------------------------------------
+
+        elif planned_tool == "study_plan_generator":
+
+            subject = plan.get(
+                "subject",
+                "General Studies"
+            )
+
+            days = plan.get(
                 "days",
                 7
-    )
+            )
 
-                hours_per_day = plan.get(
+            hours_per_day = plan.get(
                 "hours_per_day",
                 1
-    )
+            )
 
-           plan_result = study_plan_generator(
-           subject=subject,
-           days=days,
-           hours_per_day=hours_per_day,
-           topics=weak_result
-    )
+            plan_result = study_plan_generator(
+                subject=subject,
+                days=days,
+                hours_per_day=hours_per_day,
+                topics=weak_result
+            )
 
-           tool_results.append(
-        {
-            "tool": "study_plan_generator",
-            "result": plan_result
-        }
-    )
-
-    tool_trace.append(
-        {
-            "step": len(tool_trace) + 1,
-            "tool": "study_plan_generator",
-            "status": "success",
-            "arguments": json.dumps(
+            tool_results.append(
                 {
-                    "subject": subject,
-                    "days": days,
-                    "hours_per_day": hours_per_day
-                },
-                    ensure_ascii=False
-            ),
+                    "tool": "study_plan_generator",
                     "result": plan_result
-        }
-    )
-                    
-                    
-                    
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "study_plan_generator",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "subject": subject,
+                            "days": days,
+                            "hours_per_day": hours_per_day
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": plan_result
+                }
+            )
+
+    # ----------------------------------------------------
+     
+    # ----------------------------------------------------
+
+        elif planned_tool == "study_plan_generator":
+
+            subject = plan.get(
+                "subject",
+                "General Studies"
+            )
+
+            days = plan.get(
+                "days",
+                7
+            )
+
+            hours_per_day = plan.get(
+                "hours_per_day",
+                1
+            )
+
+            plan_result = study_plan_generator(
+                subject=subject,
+                days=days,
+                hours_per_day=hours_per_day,
+                topics=weak_result
+            )
+
+            tool_results.append(
+                {
+                    "tool": "study_plan_generator",
+                    "result": plan_result
+                }
+            )
+
+            tool_trace.append(
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "study_plan_generator",
+                    "status": "success",
+                    "arguments": json.dumps(
+                        {
+                            "subject": subject,
+                            "days": days,
+                            "hours_per_day": hours_per_day
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": plan_result
+                }
+            )
                 
 
-                   tool_results.append(
-                    {
-                        "tool": "study_plan_generator",
-                        "result": plan_result
-                    }
-                )
+    
 
-                  tool_trace.append(
-                    {
-                        "step": len(tool_trace) + 1,
-                        "tool": "study_plan_generator",
-                        "status": "success",
-                        "arguments": json.dumps(
-                            {
-                                "subject": "Biology",
-                                "days": 7,
-                                "hours_per_day": 1
-                            },
-                            ensure_ascii=False
-                        ),
-                        "result": plan_result
-                    }
-                )
+           
 
    
     
