@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 
 from agent import ask_agent
+from evaluation import run_all_tests
+
 
 app = FastAPI(title="EduAgent AI")
 
@@ -23,14 +25,11 @@ class Question(BaseModel):
 
 @app.get("/")
 def home():
-    return {
-        "message": "EduAgent AI is running 🚀"
-    }
+    return {"message": "EduAgent AI is running 🚀"}
 
 
 @app.post("/ask")
 def ask_question(data: Question):
-
     result = ask_agent(
         question=data.question,
         session_id=data.session_id
@@ -43,3 +42,8 @@ def ask_question(data: Question):
         "tool_trace": result["tool_trace"],
         "sources": result.get("sources", [])
     }
+
+
+@app.get("/evaluate")
+def evaluate_agent():
+    return run_all_tests()
