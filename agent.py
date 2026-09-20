@@ -2503,16 +2503,11 @@ Choose the minimum required tool.
     # ============================================================
 
     final_answer = generate_final_answer(
-        question=
-            standalone_question,
-        tool_results=
-            tool_results,
-        conversation=
-            conversation_memory.get(
-                session_id,
-                []
-            )
+    question=standalone_question,
+    tool_results=tool_results
     )
+        
+            
 
     tool_trace.append(
         {
