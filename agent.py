@@ -1972,7 +1972,7 @@ if plan.get("needs_planning", False):
                 }
             )
 
-        # --------------------------------------------------------
+# --------------------------------------------------------
 # Execute Planned Steps
 # --------------------------------------------------------
 
@@ -2066,59 +2066,11 @@ if plan.get("needs_planning", False):
                     ),
                     "result": plan_result
                 }
-            )
+    )
 
-    # ----------------------------------------------------
-     
-    # ----------------------------------------------------
-
-        elif planned_tool == "study_plan_generator":
-
-            subject = plan.get(
-                "subject",
-                "General Studies"
-            )
-
-            days = plan.get(
-                "days",
-                7
-            )
-
-            hours_per_day = plan.get(
-                "hours_per_day",
-                1
-            )
-
-            plan_result = study_plan_generator(
-                subject=subject,
-                days=days,
-                hours_per_day=hours_per_day,
-                topics=weak_result
-            )
-
-            tool_results.append(
-                {
-                    "tool": "study_plan_generator",
-                    "result": plan_result
-                }
-            )
-
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "study_plan_generator",
-                    "status": "success",
-                    "arguments": json.dumps(
-                        {
-                            "subject": subject,
-                            "days": days,
-                            "hours_per_day": hours_per_day
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": plan_result
-                }
-            )
+   
+                    
+                    
                 
 
     
