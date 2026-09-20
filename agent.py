@@ -2728,11 +2728,12 @@ Choose the minimum required tool.
         session_id,
         []
     ),
-    conversation_history=conversation_memory.get(
-        session_id,
-        []
+    conversation_history=get_conversation_history(
+        session_id
     )
     )
+    
+    
     
         
             
