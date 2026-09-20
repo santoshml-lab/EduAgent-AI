@@ -199,6 +199,7 @@ def execute_web_search(question: str):
             "result": f"Web search error: {str(e)}"
         }
 
+
 # ============================================================
 # Helper: Execute Web Search Retry
 # ============================================================
@@ -230,6 +231,7 @@ def execute_web_search_retry(question: str):
             "result": f"Web search retry error: {str(e)}"
         }
 
+
 # ============================================================
 # Helper: Detect Version Conflicts
 # ============================================================
@@ -238,12 +240,6 @@ def detect_version_conflict(
     question: str,
     tool_result
 ):
-    """
-    Deterministic sanity check for software version questions.
-
-    Prevents an older maintenance/security release from
-    being incorrectly treated as the latest feature release.
-    """
 
     if not re.search(
         r"\b(latest|newest|current)\b.*\b(version|release)\b"
@@ -251,6 +247,7 @@ def detect_version_conflict(
         question,
         re.IGNORECASE
     ):
+
         return {
             "checked": False,
             "conflict": False,
@@ -262,14 +259,13 @@ def detect_version_conflict(
         ensure_ascii=False
     )
 
-    # Extract semantic versions such as:
-    # 3.14.7, 3.11.16, 4.2.1
     versions = re.findall(
         r"\b(\d+)\.(\d+)\.(\d+)\b",
         result_text
     )
 
     if not versions:
+
         return {
             "checked": True,
             "conflict": False,
@@ -289,9 +285,6 @@ def detect_version_conflict(
         map(str, highest_version)
     )
 
-    # If multiple materially different versions are present,
-    # flag the result so the LLM validator cannot blindly accept
-    # an older maintenance release.
     unique_versions = sorted(
         set(version_tuples),
         reverse=True
@@ -306,9 +299,7 @@ def detect_version_conflict(
                 "Multiple software versions were found in the "
                 "retrieved result. The highest semantic version "
                 f"detected is {highest_version_text}. "
-                "The result requires careful validation to ensure "
-                "an older maintenance/security release is not "
-                "mistaken for the latest feature release."
+                "The result requires careful validation."
             ),
             "highest_version": highest_version_text,
             "versions_found": [
@@ -353,8 +344,8 @@ def validate_tool_result(
                     "content": """
 You are the validation layer of EduAgent AI.
 
-Check whether the tool result is useful and relevant
-for answering the user's question.
+Check whether the tool result is useful, relevant,
+accurate, and sufficient for answering the user's question.
 
 Return ONLY valid JSON:
 
@@ -367,95 +358,33 @@ Return ONLY valid JSON:
 
 Rules:
 
-You are the validation layer of EduAgent AI.
+1. Check relevance.
 
-Your job is NOT just to check whether the tool result
-contains an answer.
+2. Check whether the result actually supports the
+   user's question.
 
-You must verify whether the result actually supports
-the correct answer to the user's question.
+3. Never invent facts.
 
-Return ONLY valid JSON:
+4. For current/latest questions, verify that the
+   information represents the current state.
 
-{
-  "valid": true,
-  "reason": "",
-  "needs_retry": false,
-  "retry_strategy": "none"
-}
+5. For software version questions, distinguish stable
+   releases from beta, alpha, preview, nightly, and
+   development versions.
 
-Validation rules:
+6. If sources conflict and another search could resolve
+   the conflict, use:
+   "needs_retry": true
+   "retry_strategy": "new_search"
 
-1. Relevance
-- Check whether the result directly answers the user's question.
+7. For calculator errors, use:
+   "retry_strategy": "recalculate"
 
-2. Accuracy
-- Check whether the factual claim in the result is actually
-  supported by the retrieved sources.
+8. Use "none" when retry is unnecessary.
 
-3. Conflicting sources
-- If multiple sources disagree, do NOT automatically accept
-  the result.
-- Compare the sources and identify the most authoritative
-  and relevant source.
-- Prefer official primary sources over third-party sources,
-  forums, aggregators, or Wikipedia when available.
+9. Do not assume the first search result is correct.
 
-4. Latest/current questions
-- For questions containing words such as:
-  latest, current, recent, today, newest, official,
-  first verify that the retrieved information represents
-  the current state.
-- Do not treat an older version, legacy release, or historical
-  release as the latest version.
-- Distinguish stable releases from beta, alpha, release
-  candidates, previews, development versions, and nightly builds.
-
-5. Version questions
-- When the user asks for the latest version of software,
-  compare the version numbers and release status.
-- A maintenance/security release of an older major/minor series
-  must NOT be treated as the latest feature release if a newer
-  stable feature release exists.
-
-6. Retry decision
-- valid = false when the retrieved sources contain conflicting
-  information that prevents a reliable answer.
-- valid = false when the search result is outdated for a
-  current/latest question.
-- needs_retry = true when a better web search could reasonably
-  resolve the uncertainty.
-- retry_strategy = "new_search" for such cases.
-
-7. Calculator
-- Use "recalculate" only when the calculator result itself
-  appears incorrect or incomplete.
-
-8. Web search
-- Use "new_search" when the web result is outdated,
-  contradictory, ambiguous, or insufficient.
-
-9. No retry
-- Use "none" only when the result is sufficiently reliable
-  to answer the question.
-
-Never invent facts.
-Never assume that the first search result is correct.
-- needs_retry = true only when another tool attempt
-  could reasonably fix the problem.
-- Do not invent facts.
-- retry_strategy must be one of:
-  "recalculate",
-  "new_search",
-  "none"
-
-- Use "recalculate" when the calculator result
-  should be recalculated.
-
-- Use "new_search" when a web search should be
-  attempted again with a better query.
-
-- Use "none" when retry is unnecessary.
+10. Never invent missing information.
 """
                 },
                 {
@@ -511,8 +440,10 @@ Validate this result.
         return {
             "valid": True,
             "reason": f"Validation fallback: {str(e)}",
-            "needs_retry": False
+            "needs_retry": False,
+            "retry_strategy": "none"
         }
+
 
 # ============================================================
 # Helper: Create Agent Plan
@@ -523,6 +454,7 @@ def create_agent_plan(question: str):
     try:
 
         response = client.chat.completions.create(
+
             model="openai/gpt-oss-20b",
 
             messages=[
@@ -545,7 +477,6 @@ Schema:
   "days": 7,
   "hours_per_day": 1,
   "steps": [
-  
     {
       "step": 1,
       "tool": "",
@@ -566,41 +497,54 @@ Allowed tools:
 
 Rules:
 
-- Use only the allowed tools.
-- Do not invent tool names.
-- Simple questions should have
-  needs_planning = false and an empty steps list.
-- Use multiple steps when one tool's result is needed
+- Use only allowed tools.
+- Never invent tool names.
+- Simple questions should have needs_planning = false.
+- Use multiple steps when one tool's result is required
   by a later step.
-- Keep the plan concise.
 - Steps must be ordered logically.
 - Do not answer the user's question.
-- Extract the subject, number of days, and hours per day
-  only when they are explicitly provided by the user.
+- Extract subject, days, and hours only when explicitly
+  provided by the user.
+- Never invent a subject.
+- Never invent a number of days.
+- Never invent study hours.
 
-- Never invent a subject, number of days, or study hours.
+If days are not explicitly provided:
+use 7.
 
-- If the user does not explicitly provide the number of days,
-  use 7.
+If hours per day are not explicitly provided:
+use 1.
 
-- If the user does not explicitly provide hours per day,
-  use 1.
+For study-plan requests return:
+"subject": "",
+"days": 7,
+"hours_per_day": 1
 
-- For study-plan requests, return these additional fields:
-  "subject": "",
-  "days": 7,
-  "hours_per_day": 1
+The subject must come from the user's request or
+available learning-progress data.
 
-- The subject must come from the user's request or the
-  learning-progress data available in the conversation.
+Do not create academic subtopics that the user
+did not provide.
 
-- Do not create academic subtopics that the user did not provide.
+For a request such as:
+
+"My Physics scores are:
+Force 52%, Work Energy 64%, Light 85%.
+Find my weak topics and make a 5-day revision plan
+with 2 hours per day."
+
+the correct plan is:
+
+Step 1:
+weak_topic_detector
+
+Step 2:
+study_plan_generator
+
+The study plan must receive the weak-topic result
+from Step 1.
 """
-
-
-
-    
-    
                 },
                 {
                     "role": "user",
@@ -632,9 +576,9 @@ Rules:
             content
         )
 
-        plan = json.loads(content)
-
-        return plan
+        return json.loads(
+            content
+        )
 
     except Exception as e:
 
@@ -652,10 +596,6 @@ Rules:
 
 def execute_quiz(question: str):
 
-    # --------------------------------------------------------
-    # Number of Questions
-    # --------------------------------------------------------
-
     number_match = re.search(
         r"(\d+)\s*[-]?\s*questions?",
         question,
@@ -663,20 +603,19 @@ def execute_quiz(question: str):
     )
 
     if number_match:
+
         number_of_questions = int(
             number_match.group(1)
         )
+
     else:
+
         number_of_questions = 5
 
     number_of_questions = max(
         1,
         min(number_of_questions, 20)
     )
-
-    # --------------------------------------------------------
-    # Difficulty
-    # --------------------------------------------------------
 
     if re.search(
         r"\bhard\b|\bdifficult\b|\badvanced\b",
@@ -697,10 +636,6 @@ def execute_quiz(question: str):
     else:
 
         difficulty = "medium"
-
-    # --------------------------------------------------------
-    # Subject
-    # --------------------------------------------------------
 
     subjects = [
         "biology",
@@ -730,10 +665,6 @@ def execute_quiz(question: str):
             subject = item
             break
 
-    # --------------------------------------------------------
-    # Normalize Subject
-    # --------------------------------------------------------
-
     subject_map = {
         "biology": "Biology",
         "physics": "Physics",
@@ -754,19 +685,10 @@ def execute_quiz(question: str):
         subject
     )
 
-    # --------------------------------------------------------
-    # Topic
-    # --------------------------------------------------------
-
     topic = subject
 
     topic_match = re.search(
-        r"(?:on|about)\s+"
-        r"(?:biology|physics|chemistry|mathematics|math|"
-        r"computer\s+science|computer|geography|history|"
-        r"civics|english|economics)"
-        r"\s+(?:about|on)\s+"
-        r"(.+?)(?:\s+at|\s+with|\s*$)",
+        r"(?:about|on)\s+(.+?)(?:\s+at|\s+with|\s*$)",
         question,
         re.IGNORECASE
     )
@@ -775,49 +697,13 @@ def execute_quiz(question: str):
 
         topic = topic_match.group(1).strip()
 
-    else:
-
-        topic_match = re.search(
-            r"(?:about|on)\s+"
-            r"(.+?)(?:\s+at|\s+with|\s*$)",
-            question,
-            re.IGNORECASE
-        )
-
-        if topic_match:
-
-            extracted_topic = (
-                topic_match.group(1).strip()
-            )
-
-            subject_pattern = re.escape(
-                subject
-            )
-
-            extracted_topic = re.sub(
-                rf"^{subject_pattern}\s+(?:about|on)\s+",
-                "",
-                extracted_topic,
-                flags=re.IGNORECASE
-            ).strip()
-
-            if extracted_topic:
-                topic = extracted_topic
-
-    # --------------------------------------------------------
-    # Clean Topic
-    # --------------------------------------------------------
-
     topic = topic.strip(
         " .,?!"
     )
 
     if not topic:
-        topic = subject
 
-    # --------------------------------------------------------
-    # Call Quiz Generator
-    # --------------------------------------------------------
+        topic = subject
 
     result = quiz_generator(
         subject=subject,
@@ -826,21 +712,12 @@ def execute_quiz(question: str):
         difficulty=difficulty
     )
 
-    # --------------------------------------------------------
-    # Return Result
-    # --------------------------------------------------------
-
     return {
         "success": True,
         "subject": subject,
         "topic": topic,
         "number_of_questions": number_of_questions,
         "difficulty": difficulty,
-        "instruction": (
-            f"Generate {number_of_questions} "
-            f"{difficulty}-difficulty questions "
-            f"on {topic} in {subject}."
-        ),
         "result": result
     }
 
@@ -914,9 +791,7 @@ def execute_study_plan(question: str):
 # Helper: Extract Learning Progress
 # ============================================================
 
-def extract_learning_progress(
-    question: str
-):
+def extract_learning_progress(question: str):
 
     try:
 
@@ -948,72 +823,15 @@ Schema:
 
 Rules:
 
-1. Extract every topic and score explicitly provided by the user.
+1. Extract every topic and score explicitly provided.
 
-2. If the user gives topic-wise scores, create one record
-   for each topic.
+2. Create one record for each topic.
 
-Example:
+3. Never invent topics.
 
-Biology:
-Cell Biology 55%
-Genetics 68%
-Ecology 82%
+4. Never invent scores.
 
-Return:
-
-{
-  "records": [
-    {
-      "subject": "Biology",
-      "topic": "Cell Biology",
-      "score": 55,
-      "score_type": "percentage",
-      "note": ""
-    },
-    {
-      "subject": "Biology",
-      "topic": "Genetics",
-      "score": 68,
-      "score_type": "percentage",
-      "note": ""
-    },
-    {
-      "subject": "Biology",
-      "topic": "Ecology",
-      "score": 82,
-      "score_type": "percentage",
-      "note": ""
-    }
-  ]
-}
-
-3. If only an overall subject score is provided,
-   keep the topic as an empty string.
-
-Example:
-
-"My Biology score is 62%"
-
-Return:
-
-{
-  "records": [
-    {
-      "subject": "Biology",
-      "topic": "",
-      "score": 62,
-      "score_type": "percentage",
-      "note": ""
-    }
-  ]
-}
-
-4. Never invent topics.
-
-5. Never invent scores.
-
-6. If no score is provided, return:
+5. If no score is provided, return:
 
 {
   "records": []
@@ -1061,14 +879,6 @@ Return:
         }
 
 
-
-
-
-
-                
-          
-
-
 # ============================================================
 # Helper: Save Learning Progress
 # ============================================================
@@ -1084,6 +894,7 @@ def save_learning_progress(
     )
 
     if not isinstance(records, list):
+
         return
 
     learning_progress.setdefault(
@@ -1094,6 +905,7 @@ def save_learning_progress(
     for progress in records:
 
         if progress.get("score") is None:
+
             continue
 
         new_record = {
@@ -1172,25 +984,18 @@ def save_learning_progress(
                 new_record
             )
 
-            learning_progress[session_id] = (
+        learning_progress[session_id] = (
             learning_progress[session_id][
-            -MAX_PROGRESS_ITEMS:
-        ]
-    )
-
-        
-
-   
-            
+                -MAX_PROGRESS_ITEMS:
+            ]
+        )
 
 
 # ============================================================
 # Helper: Execute Quiz Result
 # ============================================================
 
-def execute_quiz_result(
-    question: str
-):
+def execute_quiz_result(question: str):
 
     try:
 
@@ -1259,9 +1064,7 @@ def execute_quiz_result(
 # Helper: Generate Targeted Revision
 # ============================================================
 
-def generate_targeted_revision(
-    progress: list
-):
+def generate_targeted_revision(progress: list):
 
     weak_topics = weak_topic_detector(
         progress
@@ -1307,8 +1110,8 @@ def generate_targeted_revision(
                     "score"
                 ),
                 "revision_action": (
-                    "Revise the core concepts and "
-                    "practice targeted questions."
+                    "Revise the topic and practice "
+                    "targeted questions."
                 )
             }
         )
@@ -1323,6 +1126,35 @@ def generate_targeted_revision(
 
 
 # ============================================================
+# Helper: Save Conversation
+# ============================================================
+
+def save_conversation(
+    session_id: str,
+    question: str,
+    answer: str
+):
+
+    conversation_memory.setdefault(
+        session_id,
+        []
+    )
+
+    conversation_memory[session_id].append(
+        {
+            "user": question,
+            "assistant": answer
+        }
+    )
+
+    conversation_memory[session_id] = (
+        conversation_memory[session_id][
+            -MAX_HISTORY:
+        ]
+    )
+
+
+# ============================================================
 # Main Agent
 # ============================================================
 
@@ -1331,19 +1163,15 @@ def ask_agent(
     session_id: str = "default"
 ):
 
-    # --------------------------------------------------------
-    # User Question
-    # --------------------------------------------------------
-
     standalone_question = question
 
     conversation_history = get_conversation_history(
         session_id
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Direct Quiz Detection
-    # --------------------------------------------------------
+    # ========================================================
 
     direct_quiz_query = re.search(
         r"\b("
@@ -1390,26 +1218,10 @@ def ask_agent(
             ""
         )
 
-        # ----------------------------------------------------
-        # Save Conversation Memory
-        # ----------------------------------------------------
-
-        conversation_memory.setdefault(
+        save_conversation(
             session_id,
-            []
-        )
-
-        conversation_memory[session_id].append(
-            {
-                "user": question,
-                "assistant": answer
-            }
-        )
-
-        conversation_memory[session_id] = (
-            conversation_memory[session_id][
-                -MAX_HISTORY:
-            ]
+            question,
+            answer
         )
 
         return {
@@ -1418,9 +1230,9 @@ def ask_agent(
             "sources": []
         }
 
-    # --------------------------------------------------------
+    # ========================================================
     # Learning Progress Extraction
-    # --------------------------------------------------------
+    # ========================================================
 
     progress_update = extract_learning_progress(
         question
@@ -1431,17 +1243,13 @@ def ask_agent(
         progress_update
     )
 
-    # --------------------------------------------------------
-    # Current Progress
-    # --------------------------------------------------------
-
     progress = learning_progress.get(
         session_id,
         []
     )
 
     # ========================================================
-    # Direct Weak Topic / Revision Detection
+    # Direct Weak Topic Detection
     # ========================================================
 
     weak_topic_match = re.search(
@@ -1465,12 +1273,12 @@ def ask_agent(
     if (
         weak_topic_match
         and not re.search(
-        r"\b(study plan|revision plan|study schedule|"
-        r"timetable|schedule|plan for \d+\s*[-]?\s*day)\b",
-        standalone_question,
-        re.IGNORECASE
-    )
-):
+            r"\b(study plan|revision plan|study schedule|"
+            r"timetable|schedule|plan for \d+\s*[-]?\s*day)\b",
+            standalone_question,
+            re.IGNORECASE
+        )
+    ):
 
         weak_topics_result = weak_topic_detector(
             progress
@@ -1480,13 +1288,7 @@ def ask_agent(
             progress
         )
 
-        tool_trace = []
-
-        # ----------------------------------------------------
-        # Weak Topic Detector Trace
-        # ----------------------------------------------------
-
-        tool_trace.append(
+        tool_trace = [
             {
                 "step": 1,
                 "tool": "weak_topic_detector",
@@ -1498,14 +1300,7 @@ def ask_agent(
                     ensure_ascii=False
                 ),
                 "result": weak_topics_result
-            }
-        )
-
-        # ----------------------------------------------------
-        # Targeted Revision Trace
-        # ----------------------------------------------------
-
-        tool_trace.append(
+            },
             {
                 "step": 2,
                 "tool": "targeted_revision",
@@ -1525,112 +1320,44 @@ def ask_agent(
                     ""
                 )
             }
+        ]
+
+        final_answer = generate_final_answer(
+            question=standalone_question,
+            progress=progress,
+            tool_results=[
+                {
+                    "tool": "weak_topic_detector",
+                    "result": weak_topics_result
+                },
+                {
+                    "tool": "targeted_revision",
+                    "result": revision_result.get(
+                        "result",
+                        ""
+                    )
+                }
+            ],
+            conversation_history=conversation_history
         )
-
-        # ----------------------------------------------------
-        # Generate Student-Friendly Answer
-        # ----------------------------------------------------
-
-        try:
-
-            final_response = client.chat.completions.create(
-
-                model="openai/gpt-oss-20b",
-
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """
-You are EduAgent AI.
-
-Use the learning progress and revision results
-to give the user a clear, student-friendly answer.
-
-Identify the weak topic from the available data.
-
-Give a practical revision recommendation.
-
-Do not mention tools, routing, internal architecture,
-or implementation details.
-"""
-                    },
-                    {
-                        "role": "user",
-                        "content": f"""
-User question:
-
-{standalone_question}
-
-Learning progress:
-
-{json.dumps(progress, ensure_ascii=False)}
-
-Weak topic result:
-
-{weak_topics_result}
-
-Targeted revision:
-
-{revision_result.get("result", "")}
-
-Write a concise and useful revision recommendation.
-"""
-                    }
-                ],
-
-                temperature=0.2
-            )
-
-            answer = (
-                final_response
-                .choices[0]
-                .message
-                .content
-            )
-
-        except Exception as e:
-
-            answer = (
-                f"Revision response error: {str(e)}"
-            )
-
-        # ----------------------------------------------------
-        # Final Response Trace
-        # ----------------------------------------------------
 
         tool_trace.append(
             {
-                "step": 3,
+                "step": len(tool_trace) + 1,
                 "tool": "final_response",
                 "status": "success",
-                "result": answer
+                "result": final_answer
             }
         )
 
-        # ----------------------------------------------------
-        # Save Conversation Memory
-        # ----------------------------------------------------
-
-        conversation_memory.setdefault(
+        save_conversation(
             session_id,
-            []
-        )
-
-        conversation_memory[session_id].append(
-            {
-                "user": question,
-                "assistant": answer
-            }
-        )
-
-        conversation_memory[session_id] = (
-            conversation_memory[session_id][
-                -MAX_HISTORY:
-            ]
+            question,
+            final_answer
         )
 
         return {
-            "answer": answer,
+            "answer": final_answer,
             "tool_trace": tool_trace,
             "sources": []
         }
@@ -1679,26 +1406,10 @@ Write a concise and useful revision recommendation.
             ""
         )
 
-        # ----------------------------------------------------
-        # Save Conversation Memory
-        # ----------------------------------------------------
-
-        conversation_memory.setdefault(
+        save_conversation(
             session_id,
-            []
-        )
-
-        conversation_memory[session_id].append(
-            {
-                "user": question,
-                "assistant": answer
-            }
-        )
-
-        conversation_memory[session_id] = (
-            conversation_memory[session_id][
-                -MAX_HISTORY:
-            ]
+            question,
+            answer
         )
 
         return {
@@ -1717,7 +1428,10 @@ Write a concise and useful revision recommendation.
 
     planner_trace = None
 
-    if plan.get("needs_planning", False):
+    if plan.get(
+        "needs_planning",
+        False
+    ):
 
         planner_trace = {
             "step": 1,
@@ -1732,9 +1446,9 @@ Write a concise and useful revision recommendation.
             "result": plan
         }
 
-    # --------------------------------------------------------
-    # Router Tools
-    # --------------------------------------------------------
+    # ========================================================
+    # Router
+    # ========================================================
 
     router_tools = [
         tool
@@ -1743,10 +1457,6 @@ Write a concise and useful revision recommendation.
         != "quiz_result_analyzer"
     ]
 
-    # --------------------------------------------------------
-    # Router
-    # --------------------------------------------------------
-
     router_messages = [
 
         {
@@ -1754,7 +1464,7 @@ Write a concise and useful revision recommendation.
             "content": """
 You are the intent router for an educational AI agent.
 
-Classify the user's request into one or more of these intents:
+Classify the user's request into one or more intents:
 
 1. explanation
 2. numerical
@@ -1764,47 +1474,15 @@ Classify the user's request into one or more of these intents:
 6. weak_topic
 7. quiz_result
 
-IMPORTANT INTENT RULES:
+Rules:
 
-For numerical:
-- Use numerical when the user asks to calculate, solve, find the value of,
-  multiply, divide, add, subtract, or evaluate a mathematical expression.
-- Mathematical expressions using symbols such as:
-  +, -, *, /, ×, ÷, =, %, ^
-  should normally be classified as numerical when the user wants a result.
-- Examples:
-  "What is 125 * 48?"
-  "Calculate 25 + 75"
-  "Solve 12 × 8"
-  "What is 500 / 25?"
-  "Find 20% of 500"
-- These requests MUST be classified as numerical.
-
-For explanation:
-- Use explanation when the user wants a concept, definition,
-  theory, or educational explanation.
-
-For quiz:
-- Use quiz when the user asks to create, generate, give, or take a quiz.
-
-For study_plan:
-- Use study_plan when the user asks for a study schedule,
-  timetable, or study plan.
-
-For current_information:
-- Use current_information when the user asks for latest,
-  recent, current, today's information, news, or information
-  that requires web search.
-
-For weak_topic:
-- Use weak_topic when the user asks about weak topics,
-  what they should revise, what they should study,
-  or where they should focus based on learning progress.
-
-For quiz_result:
-- Only classify the request as quiz_result.
-- DO NOT call quiz_result_analyzer.
-- Quiz result analysis is handled separately by the application.
+- Numerical questions require calculator.
+- Explanation questions require explanation.
+- Quiz requests require quiz_generator.
+- Study-plan requests require study_plan_generator.
+- Current/latest/recent questions require web_search.
+- Weak-topic requests require weak_topic_detector.
+- Quiz-result requests are handled by the application.
 
 Priority:
 
@@ -1816,12 +1494,7 @@ numerical
 current_information
 explanation
 
-Always choose the most relevant intent.
-
-When a mathematical calculation is explicitly requested,
-prefer numerical over explanation.
-
-Use the available tools only when appropriate.
+Use tools only when appropriate.
 """
         },
 
@@ -1831,7 +1504,6 @@ Use the available tools only when appropriate.
             "role": "user",
             "content": standalone_question
         }
-
     ]
 
     try:
@@ -1856,10 +1528,6 @@ Use the available tools only when appropriate.
             "tool_trace": [],
             "sources": []
         }
-
-    # --------------------------------------------------------
-    # Read Router Tool Calls
-    # --------------------------------------------------------
 
     tool_calls = (
         router_response
@@ -1914,9 +1582,15 @@ Use the available tools only when appropriate.
                     "quiz_result"
                 )
 
-    # --------------------------------------------------------
+    # Remove duplicates while preserving order
+
+    intents = list(
+        dict.fromkeys(intents)
+    )
+
+    # ========================================================
     # Tool Execution
-    # --------------------------------------------------------
+    # ========================================================
 
     tool_trace = []
     tool_results = []
@@ -1926,167 +1600,126 @@ Use the available tools only when appropriate.
 
         tool_trace.append(
             planner_trace
-    )
+        )
 
-    # --------------------------------------------------------
-# Execute Planned Steps
-# --------------------------------------------------------
+    # ========================================================
+    # Execute Planned Steps
+    # ========================================================
 
-if plan.get("needs_planning", False):
+    planned_tools = set()
 
-    weak_result = None
+    if plan.get(
+        "needs_planning",
+        False
+    ):
 
-    for planned_step in plan.get("steps", []):
+        weak_result = None
 
-        planned_tool = planned_step.get("tool")
+        for planned_step in plan.get(
+            "steps",
+            []
+        ):
 
-        # ----------------------------------------------------
-        # Step: Weak Topic Detector
-        # ----------------------------------------------------
-
-        if planned_tool == "weak_topic_detector":
-
-            weak_result = weak_topic_detector(
-                progress
+            planned_tool = planned_step.get(
+                "tool"
             )
 
-            tool_results.append(
-                {
-                    "tool": "weak_topic_detector",
-                    "result": weak_result
-                }
+            planned_tools.add(
+                planned_tool
             )
 
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "weak_topic_detector",
-                    "status": "success",
-                    "arguments": json.dumps(
-                        {
-                            "progress_items": len(progress)
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": weak_result
-                }
-            )
+            # ------------------------------------------------
+            # Weak Topic Detector
+            # ------------------------------------------------
 
-# --------------------------------------------------------
-# Execute Planned Steps
-# --------------------------------------------------------
+            if planned_tool == "weak_topic_detector":
 
-if plan.get("needs_planning", False):
+                weak_result = weak_topic_detector(
+                    progress
+                )
 
-    weak_result = None
+                tool_results.append(
+                    {
+                        "tool": "weak_topic_detector",
+                        "result": weak_result
+                    }
+                )
 
-    for planned_step in plan.get("steps", []):
+                tool_trace.append(
+                    {
+                        "step": len(tool_trace) + 1,
+                        "tool": "weak_topic_detector",
+                        "status": "success",
+                        "arguments": json.dumps(
+                            {
+                                "progress_items": len(progress)
+                            },
+                            ensure_ascii=False
+                        ),
+                        "result": weak_result
+                    }
+                )
 
-        planned_tool = planned_step.get("tool")
+            # ------------------------------------------------
+            # Study Plan Generator
+            # ------------------------------------------------
 
-        # ----------------------------------------------------
-        # Step: Weak Topic Detector
-        # ----------------------------------------------------
+            elif planned_tool == "study_plan_generator":
 
-        if planned_tool == "weak_topic_detector":
+                subject = plan.get(
+                    "subject",
+                    "General Studies"
+                )
 
-            weak_result = weak_topic_detector(
-                progress
-            )
+                days = plan.get(
+                    "days",
+                    7
+                )
 
-            tool_results.append(
-                {
-                    "tool": "weak_topic_detector",
-                    "result": weak_result
-                }
-            )
+                hours_per_day = plan.get(
+                    "hours_per_day",
+                    1
+                )
 
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "weak_topic_detector",
-                    "status": "success",
-                    "arguments": json.dumps(
-                        {
-                            "progress_items": len(progress)
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": weak_result
-                }
-            )
+                plan_result = study_plan_generator(
+                    subject=subject,
+                    days=days,
+                    hours_per_day=hours_per_day,
+                    topics=weak_result
+                )
 
-        # ----------------------------------------------------
-        # Step: Study Plan Generator
-        # ----------------------------------------------------
+                tool_results.append(
+                    {
+                        "tool": "study_plan_generator",
+                        "result": plan_result
+                    }
+                )
 
-        elif planned_tool == "study_plan_generator":
+                tool_trace.append(
+                    {
+                        "step": len(tool_trace) + 1,
+                        "tool": "study_plan_generator",
+                        "status": "success",
+                        "arguments": json.dumps(
+                            {
+                                "subject": subject,
+                                "days": days,
+                                "hours_per_day": hours_per_day
+                            },
+                            ensure_ascii=False
+                        ),
+                        "result": plan_result
+                    }
+                )
 
-            subject = plan.get(
-                "subject",
-                "General Studies"
-            )
-
-            days = plan.get(
-                "days",
-                7
-            )
-
-            hours_per_day = plan.get(
-                "hours_per_day",
-                1
-            )
-
-            plan_result = study_plan_generator(
-                subject=subject,
-                days=days,
-                hours_per_day=hours_per_day,
-                topics=weak_result
-            )
-
-            tool_results.append(
-                {
-                    "tool": "study_plan_generator",
-                    "result": plan_result
-                }
-            )
-
-            tool_trace.append(
-                {
-                    "step": len(tool_trace) + 1,
-                    "tool": "study_plan_generator",
-                    "status": "success",
-                    "arguments": json.dumps(
-                        {
-                            "subject": subject,
-                            "days": days,
-                            "hours_per_day": hours_per_day
-                        },
-                        ensure_ascii=False
-                    ),
-                    "result": plan_result
-                }
-    )
-
-   
-                    
-                    
-                
-
-    
-
-           
-
-   
-    
-
-    
-
-    # --------------------------------------------------------
+    # ========================================================
     # Numerical
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "numerical" in intents:
+    if (
+        "numerical" in intents
+        and "calculator" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2119,10 +1752,6 @@ if plan.get("needs_planning", False):
             ""
         )
 
-        # ----------------------------------------------------
-        # Validate Calculator Result
-        # ----------------------------------------------------
-
         validation_result = validate_tool_result(
             question=standalone_question,
             tool_name="calculator",
@@ -2151,15 +1780,6 @@ if plan.get("needs_planning", False):
             }
         )
 
-        # ----------------------------------------------------
-        # Smart Retry Calculator Once
-        # ----------------------------------------------------
-
-        retry_strategy = validation_result.get(
-            "retry_strategy",
-            "none"
-        )
-
         if (
             not validation_result.get(
                 "valid",
@@ -2169,7 +1789,9 @@ if plan.get("needs_planning", False):
                 "needs_retry",
                 False
             )
-            and retry_strategy == "recalculate"
+            and validation_result.get(
+                "retry_strategy"
+            ) == "recalculate"
         ):
 
             retry_result = execute_calculator(
@@ -2194,8 +1816,7 @@ if plan.get("needs_planning", False):
                     "arguments": json.dumps(
                         {
                             "question": standalone_question,
-                            "retry": True,
-                            "strategy": "recalculate"
+                            "retry": True
                         },
                         ensure_ascii=False
                     ),
@@ -2221,9 +1842,7 @@ if plan.get("needs_planning", False):
                     "arguments": json.dumps(
                         {
                             "validated_tool":
-                                "calculator_retry",
-                            "strategy":
-                                "recalculate"
+                                "calculator_retry"
                         },
                         ensure_ascii=False
                     ),
@@ -2243,11 +1862,14 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Current Information
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "current_information" in intents:
+    if (
+        "current_information" in intents
+        and "web_search" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2280,26 +1902,21 @@ if plan.get("needs_planning", False):
             ""
         )
 
-        # ----------------------------------------------------
-        # Validate Web Search Result
-        # ----------------------------------------------------
-
         web_validation = validate_tool_result(
-        question=standalone_question,
-        tool_name="web_search",
-        tool_result=web_result
+            question=standalone_question,
+            tool_name="web_search",
+            tool_result=web_result
         )
-
-        # ----------------------------------------------------
-        # Deterministic Version Conflict Check
-        # ----------------------------------------------------
 
         version_check = detect_version_conflict(
             question=standalone_question,
             tool_result=web_result
         )
 
-        if version_check.get("conflict", False):
+        if version_check.get(
+            "conflict",
+            False
+        ):
 
             web_validation = {
                 "valid": False,
@@ -2317,7 +1934,10 @@ if plan.get("needs_planning", False):
                 "tool": "result_validator",
                 "status": (
                     "success"
-                    if web_validation.get("valid", False)
+                    if web_validation.get(
+                        "valid",
+                        False
+                    )
                     else "rejected"
                 ),
                 "arguments": json.dumps(
@@ -2329,16 +1949,19 @@ if plan.get("needs_planning", False):
                 "result": web_validation
             }
         )
-  
-
-        # ----------------------------------------------------
-        # Smart Web Search Retry
-        # ----------------------------------------------------
 
         if (
-            not web_validation.get("valid", False)
-            and web_validation.get("needs_retry", False)
-            and web_validation.get("retry_strategy") == "new_search"
+            not web_validation.get(
+                "valid",
+                False
+            )
+            and web_validation.get(
+                "needs_retry",
+                False
+            )
+            and web_validation.get(
+                "retry_strategy"
+            ) == "new_search"
         ):
 
             retry_trace = {
@@ -2347,20 +1970,19 @@ if plan.get("needs_planning", False):
                 "status": "running",
                 "arguments": json.dumps(
                     {
-                        "question": standalone_question,
-                        "strategy": "new_search"
+                        "question": standalone_question
                     },
                     ensure_ascii=False
                 )
             }
 
-            tool_trace.append(retry_trace)
+            tool_trace.append(
+                retry_trace
+            )
 
             web_result = execute_web_search_retry(
-            standalone_question
+                standalone_question
             )
-                
-            
 
             retry_trace["status"] = (
                 "success"
@@ -2373,7 +1995,6 @@ if plan.get("needs_planning", False):
                 ""
             )
 
-            # Validate retry result
             web_validation = validate_tool_result(
                 question=standalone_question,
                 tool_name="web_search",
@@ -2381,28 +2002,26 @@ if plan.get("needs_planning", False):
             )
 
             tool_trace.append(
-    {
-        "step": len(tool_trace) + 1,
-        "tool": "result_validator",
-        "status": (
-            "success"
-            if web_validation.get("valid", False)
-            else "rejected"
-        ),
-        "arguments": json.dumps(
-            {
-                "validated_tool": "web_search"
-            },
-            ensure_ascii=False
-        ),
-        "result": web_validation
-    }
+                {
+                    "step": len(tool_trace) + 1,
+                    "tool": "result_validator_retry",
+                    "status": (
+                        "success"
+                        if web_validation.get(
+                            "valid",
+                            False
+                        )
+                        else "rejected"
+                    ),
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool": "web_search"
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": web_validation
+                }
             )
-
-        
-            
-            
-                
 
         tool_results.append(
             {
@@ -2432,11 +2051,14 @@ if plan.get("needs_planning", False):
 
             web_sources = []
 
-    # --------------------------------------------------------
+    # ========================================================
     # Quiz
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "quiz" in intents:
+    if (
+        "quiz" in intents
+        and "quiz_generator" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2476,11 +2098,14 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Study Plan
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "study_plan" in intents:
+    if (
+        "study_plan" in intents
+        and "study_plan_generator" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2520,11 +2145,14 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Weak Topic Detector
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "weak_topic" in intents:
+    if (
+        "weak_topic" in intents
+        and "weak_topic_detector" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2560,11 +2188,14 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Targeted Revision
-    # --------------------------------------------------------
+    # ========================================================
 
-    if "weak_topic" in intents:
+    if (
+        "weak_topic" in intents
+        and "weak_topic_detector" not in planned_tools
+    ):
 
         trace = {
             "step": len(tool_trace) + 1,
@@ -2604,9 +2235,9 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Quiz Result Analyzer
-    # --------------------------------------------------------
+    # ========================================================
 
     if "quiz_result" in intents:
 
@@ -2648,194 +2279,20 @@ if plan.get("needs_planning", False):
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Final Answer
-    # --------------------------------------------------------
+    # ========================================================
 
-    if not tool_results:
+    final_answer = generate_final_answer(
+        question=standalone_question,
+        progress=progress,
+        tool_results=tool_results,
+        conversation_history=conversation_history
+    )
 
-        final_answer_messages = [
-
-            {
-                "role": "system",
-                "content": """
-You are the final answer generator of EduAgent AI.
-
-IMPORTANT RULES:
-
-- Do NOT call any tools.
-- Do NOT generate tool calls.
-- Do NOT request web search.
-- Do NOT request calculator.
-- Use ONLY the information already provided.
-- Return ONLY the final natural-language answer for the user.
-- Never output JSON.
-- Never mention internal tools, routing, validation, retries, agent architecture, or implementation details.
-
-GROUNDING RULES:
-
-1. Never invent facts, topics, subtopics, scores, dates, or study material.
-
-2. If a topic appears in the learning progress or tool results,
-   you may use that topic.
-
-3. If a specific subtopic is NOT present in the provided data,
-   do NOT invent or assume a subtopic.
-
-4. For study plans:
-   - Use only the weak topics explicitly identified by the tools.
-   - You may create study activities such as revision, practice questions,
-     self-testing, review, and assessment.
-   - Do NOT invent specific academic subtopics under a weak topic.
-   - Do NOT turn "Cell Biology" into "Cell Organelles", "Cell Processes",
-     or any other specific subtopic unless that information was provided.
-
-5. Scores must be copied exactly from the provided tool results.
-   Never calculate or guess additional scores.
-
-6. If detailed topic information is unavailable, keep the plan at the
-   topic level rather than creating imaginary subtopics.
-
-7. If the available information is insufficient for a specific claim,
-   explicitly say that the detailed information was not provided.
-
-8. The final answer must be fully grounded in the supplied tool results.
-"""
-
-            },
-
-            *conversation_history,
-
-            {
-                "role": "user",
-                "content": standalone_question
-            }
-
-        ]
-
-    else:
-
-        final_answer_messages = [
-
-            {
-                "role": "system",
-                "content": """
-You are EduAgent AI.
-
-Generate the final answer using the tool results.
-
-Do not mention internal routing,
-tool execution,
-agent architecture,
-or hidden implementation details.
-
-Give the user a clear and useful educational response.
-
-If current information was retrieved,
-use the retrieved information carefully.
-
-If learning progress or weak topics are present,
-give actionable revision guidance.
-"""
-            },
-
-            *conversation_history,
-
-            {
-                "role": "user",
-                "content": f"""
-User question:
-
-{standalone_question}
-
-Learning progress:
-
-{json.dumps(progress, ensure_ascii=False)}
-
-Tool results:
-
-{json.dumps(tool_results, ensure_ascii=False)}
-
-Write the final answer.
-"""
-            }
-
-        ]
-
-    # --------------------------------------------------------
-    # Generate Final Answer
-    # --------------------------------------------------------
-
-    try:
-
-        final_response = client.chat.completions.create(
-
-            model="openai/gpt-oss-20b",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": """
-You are the final answer generator of EduAgent AI.
-
-IMPORTANT:
-- Do NOT call any tools.
-- Do NOT generate tool calls.
-- Do NOT request web search.
-- Do NOT request calculator.
-- Use ONLY the information already provided.
-- Return ONLY the final natural-language answer for the user.
-- Never output JSON.
-- Never mention internal tools, routing, validation, retries,
-  agent architecture, or implementation details.
-"""
-                },
-
-                *conversation_history,
-
-                {
-                    "role": "user",
-                    "content": f"""
-User question:
-
-{standalone_question}
-
-Learning progress:
-
-{json.dumps(progress, ensure_ascii=False)}
-
-Available tool results:
-
-{json.dumps(tool_results, ensure_ascii=False)}
-
-Using ONLY the information above, write the final answer.
-"""
-                }
-            ],
-
-            temperature=0.2,
-
-            tool_choice="none"
-        )
-
-        final_answer = (
-            final_response
-            .choices[0]
-            .message
-            .content
-        )
-
-    except Exception as e:
-
-        final_answer = (
-            f"Final response error: {str(e)}"
-        )
-
-
-
-    # --------------------------------------------------------
-    # Add Final Response To Trace
-    # --------------------------------------------------------
+    # ========================================================
+    # Final Response Trace
+    # ========================================================
 
     tool_trace.append(
         {
@@ -2846,37 +2303,173 @@ Using ONLY the information above, write the final answer.
         }
     )
 
-    # --------------------------------------------------------
-# Save Conversation Memory
-# --------------------------------------------------------
+    # ========================================================
+    # Save Conversation Memory
+    # ========================================================
 
-conversation_memory.setdefault(
-    session_id,
-    []
-)
+    save_conversation(
+        session_id,
+        question,
+        final_answer
+    )
 
-conversation_memory[session_id].append(
-    {
-        "user": question,
-        "assistant": final_answer
+    # ========================================================
+    # Final Return
+    # ========================================================
+
+    return {
+        "answer": final_answer,
+        "tool_trace": tool_trace,
+        "sources": web_sources
     }
-)
 
-conversation_memory[session_id] = (
-    conversation_memory[session_id][
-        -MAX_HISTORY:
-    ]
-)
 
-# --------------------------------------------------------
-# Final Return
-# --------------------------------------------------------
+# ============================================================
+# Helper: Generate Final Answer
+# ============================================================
 
-return {
-    "answer": final_answer,
-    "tool_trace": tool_trace,
-    "sources": web_sources
-}
+def generate_final_answer(
+    question: str,
+    progress: list,
+    tool_results: list,
+    conversation_history: list
+):
+
+    try:
+
+        response = client.chat.completions.create(
+
+            model="openai/gpt-oss-20b",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are the final answer generator of EduAgent AI.
+
+Use ONLY the information supplied in the current
+user question, learning progress, and tool results.
+
+Never invent facts.
+
+Never invent:
+- topics
+- subtopics
+- scores
+- dates
+- chapters
+- formulas
+- study material
+- academic details
+- claims not supported by the supplied data
+
+For learning progress:
+
+- Copy topic names exactly from the supplied data.
+- Copy scores exactly from the supplied data.
+- Do not create new subtopics.
+
+For study plans:
+
+- Use only topics explicitly present in the tool results.
+- You may create generic activities such as:
+  revision
+  practice questions
+  self-testing
+  error review
+  mixed practice
+  assessment
+- Do NOT invent detailed academic subtopics.
+
+Example:
+
+If the tool says:
+
+Force = 52%
+Work Energy = 64%
+
+you may say:
+
+Force — 52%
+Work Energy — 64%
+
+You must NOT invent:
+- Newton's laws
+- friction
+- tension
+- normal force
+- kinetic energy
+- potential energy
+- conservation of energy
+- springs
+- vectors
+
+unless those details were explicitly provided.
+
+For a multi-day plan:
+
+- Preserve the exact number of days supplied by the planner.
+- Preserve the exact hours per day supplied by the planner.
+- Use only the topics supplied by the planner/tool.
+- Do not silently change the schedule.
+
+If the tool result is insufficient for a specific claim,
+say that the detailed information was not provided.
+
+The final answer should be clear, concise, practical,
+and user-friendly.
+
+Never mention internal tools, routing, validation,
+planner implementation, retries, or agent architecture.
+"""
+                },
+
+                *conversation_history,
+
+                {
+                    "role": "user",
+                    "content": f"""
+User question:
+
+{question}
+
+Learning progress:
+
+{json.dumps(
+    progress,
+    ensure_ascii=False
+)}
+
+Tool results:
+
+{json.dumps(
+    tool_results,
+    ensure_ascii=False
+)}
+
+Write the final answer using ONLY the information above.
+"""
+                }
+            ],
+
+            temperature=0.2,
+
+            tool_choice="none"
+        )
+
+        return (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+    except Exception as e:
+
+        return (
+            f"Final response error: {str(e)}"
+        )
     
 
     
