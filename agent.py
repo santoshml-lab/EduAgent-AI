@@ -1692,174 +1692,91 @@ def ask_agent(
             # ----------------------------------------------------
 
             validation = validate_agent_step(
-            question=standalone_question,
-            step=step,
-            tool_result=result
-)
-
-           # ----------------------------------------------------
-           # Study Plan Recovery / Retry
-           # ----------------------------------------------------
-
-          if (
-             tool_name == "study_plan_generator"
-             and not validation.get("valid", False)
-):
-
-             retry_result = execute_study_plan(
-             standalone_question,
-             previous_result
-    )
-
-            tool_trace.append(
-        {
-            "step": len(tool_trace) + 1,
-            "tool": "study_plan_retry",
-            "status": (
-                "success"
-                if retry_result.get("success", False)
-                else "error"
-            ),
-            "arguments": json.dumps(
-                {
-                    "question": standalone_question,
-                    "retry": True,
-                    "strategy": "regenerate_study_plan"
-                },
-                ensure_ascii=False
-            ),
-            "result": retry_result.get(
-                "result",
-                ""
+                question=standalone_question,
+                step=step,
+                tool_result=result
             )
-        }
-    )
-
-           retry_validation = validate_agent_step(
-           question=standalone_question,
-           step=step,
-           tool_result=retry_result
-    )
-
-    tool_trace.append(
-        {
-            "step": len(tool_trace) + 1,
-            "tool": "agent_validator_retry",
-            "status": (
-                "success"
-                if retry_validation.get("valid", False)
-                else "rejected"
-            ),
-            "arguments": json.dumps(
-                {
-                    "validated_tool": "study_plan_retry"
-                },
-                ensure_ascii=False
-            ),
-            "result": retry_validation
-        }
-    )
-
-    if retry_validation.get("valid", False):
-        result = retry_result
-        validation = retry_validation
-
-
-# ----------------------------------------------------
-# Force planner continuation when more steps remain
-# ----------------------------------------------------
-
-remaining_steps = len(plan.get("steps", [])) - (
-    plan.get("steps", []).index(step) + 1
-)
-
-if remaining_steps > 0:
-    validation["needs_next_step"] = True
-
-
-# ----------------------------------------------------
-# Store validator result
-# ----------------------------------------------------
-
-tool_trace.append(
-    {
-        "step": len(tool_trace) + 1,
-        "tool": "agent_validator",
-        "status": (
-            "success"
-            if validation.get("valid", False)
-            else "rejected"
-        ),
-        "arguments": json.dumps(
-            {
-                "validated_tool": tool_name
-            },
-            ensure_ascii=False
-        ),
-        "result": validation
-    }
-)
-
-
-# ----------------------------------------------------
-# Store tool result
-# ----------------------------------------------------
-
-tool_results.append(
-    {
-        "tool": tool_name,
-        "data": result
-    }
-)
-
-
-# ----------------------------------------------------
-# Collect web sources
-# ----------------------------------------------------
-
-if tool_name == "web_search":
-    try:
-        parsed_sources = json.loads(
-            result.get("result", "[]")
-        )
-
-        if isinstance(parsed_sources, list):
-            web_sources.extend(parsed_sources)
-
-    except Exception:
-        pass
-
-
-# ----------------------------------------------------
-# Stop if no next step is required
-# ----------------------------------------------------
-
-if not validation.get("needs_next_step", False):
-    break
-                
-
-
-
-            
-            
-            
-                
-             
-
-                
-                
-                
-            
-
-             
-
-            
-
-          
 
             # ----------------------------------------------------
-            # Force planner continuation based on
-            # remaining planned steps
+            # Study Plan Recovery / Retry
+            # ----------------------------------------------------
+
+            if (
+                tool_name == "study_plan_generator"
+                and not validation.get("valid", False)
+            ):
+
+                retry_result = execute_study_plan(
+                    standalone_question,
+                    previous_result
+                )
+
+                tool_trace.append(
+                    {
+                        "step": len(tool_trace) + 1,
+                        "tool": "study_plan_retry",
+                        "status": (
+                            "success"
+                            if retry_result.get(
+                                "success",
+                                False
+                            )
+                            else "error"
+                        ),
+                        "arguments": json.dumps(
+                            {
+                                "question": standalone_question,
+                                "retry": True,
+                                "strategy": "regenerate_study_plan"
+                            },
+                            ensure_ascii=False
+                        ),
+                        "result": retry_result.get(
+                            "result",
+                            ""
+                        )
+                    }
+                )
+
+                retry_validation = validate_agent_step(
+                    question=standalone_question,
+                    step=step,
+                    tool_result=retry_result
+                )
+
+                tool_trace.append(
+                    {
+                        "step": len(tool_trace) + 1,
+                        "tool": "agent_validator_retry",
+                        "status": (
+                            "success"
+                            if retry_validation.get(
+                                "valid",
+                                False
+                            )
+                            else "rejected"
+                        ),
+                        "arguments": json.dumps(
+                            {
+                                "validated_tool":
+                                    "study_plan_retry"
+                            },
+                            ensure_ascii=False
+                        ),
+                        "result": retry_validation
+                    }
+                )
+
+                if retry_validation.get(
+                    "valid",
+                    False
+                ):
+
+                    result = retry_result
+                    validation = retry_validation
+
+            # ----------------------------------------------------
+            # Force planner continuation
             # ----------------------------------------------------
 
             if index < len(
@@ -1869,28 +1786,24 @@ if not validation.get("needs_next_step", False):
                 )
             ) - 1:
 
-                validation[
-                    "needs_next_step"
-                ] = True
+                validation["needs_next_step"] = True
 
-                validation[
-                    "next_action"
-                ] = (
+                validation["next_action"] = (
                     "Execute next planned step."
                 )
 
             else:
 
-                validation[
-                    "needs_next_step"
-                ] = False
+                validation["needs_next_step"] = False
+
+            # ----------------------------------------------------
+            # Store validator result
+            # ----------------------------------------------------
 
             tool_trace.append(
                 {
-                    "step":
-                        len(tool_trace) + 1,
-                    "tool":
-                        "agent_validator",
+                    "step": len(tool_trace) + 1,
+                    "tool": "agent_validator",
                     "status": (
                         "success"
                         if validation.get(
@@ -1899,27 +1812,25 @@ if not validation.get("needs_next_step", False):
                         )
                         else "rejected"
                     ),
-                    "arguments":
-                        json.dumps(
-                            {
-                                "validated_tool":
-                                    tool_name
-                            },
-                            ensure_ascii=False
-                        ),
-                    "result":
-                        validation
+                    "arguments": json.dumps(
+                        {
+                            "validated_tool": tool_name
+                        },
+                        ensure_ascii=False
+                    ),
+                    "result": validation
                 }
             )
 
+            # ----------------------------------------------------
+            # Store tool result
+            # ----------------------------------------------------
+
             tool_results.append(
                 {
-                    "tool":
-                        tool_name,
-                    "data":
-                        result,
-                    "validation":
-                        validation
+                    "tool": tool_name,
+                    "data": result,
+                    "validation": validation
                 }
             )
 
@@ -1950,6 +1861,33 @@ if not validation.get("needs_next_step", False):
                 except Exception:
 
                     pass
+
+            # ----------------------------------------------------
+            # Continue to next planned step
+            # ----------------------------------------------------
+
+            if not validation.get(
+                "needs_next_step",
+                False
+            ):
+
+                break
+            
+      
+
+
+                
+
+
+
+            
+            
+            
+                
+     
+                
+                
+                        
 
     # ============================================================
     # Router
