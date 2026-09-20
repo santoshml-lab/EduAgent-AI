@@ -1692,27 +1692,26 @@ def ask_agent(
             # ----------------------------------------------------
 
             validation = validate_agent_step(
-                question=
-                    standalone_question,
-                step=step,
-                tool_result=result
-            )
+            question=standalone_question,
+            step=step,
+            tool_result=result
+)
 
-            # ----------------------------------------------------
-# Study Plan Recovery / Retry
-# ----------------------------------------------------
+           # ----------------------------------------------------
+           # Study Plan Recovery / Retry
+           # ----------------------------------------------------
 
-if (
-    tool_name == "study_plan_generator"
-    and not validation.get("valid", False)
+          if (
+             tool_name == "study_plan_generator"
+             and not validation.get("valid", False)
 ):
 
-    retry_result = execute_study_plan(
-        standalone_question,
-        previous_result
+             retry_result = execute_study_plan(
+             standalone_question,
+             previous_result
     )
 
-    tool_trace.append(
+            tool_trace.append(
         {
             "step": len(tool_trace) + 1,
             "tool": "study_plan_retry",
@@ -1736,10 +1735,10 @@ if (
         }
     )
 
-    retry_validation = validate_agent_step(
-        question=standalone_question,
-        step=step,
-        tool_result=retry_result
+           retry_validation = validate_agent_step(
+           question=standalone_question,
+           step=step,
+           tool_result=retry_result
     )
 
     tool_trace.append(
@@ -1753,8 +1752,7 @@ if (
             ),
             "arguments": json.dumps(
                 {
-                    "validated_tool":
-                        "study_plan_retry"
+                    "validated_tool": "study_plan_retry"
                 },
                 ensure_ascii=False
             ),
@@ -1763,9 +1761,101 @@ if (
     )
 
     if retry_validation.get("valid", False):
-
         result = retry_result
         validation = retry_validation
+
+
+# ----------------------------------------------------
+# Force planner continuation when more steps remain
+# ----------------------------------------------------
+
+remaining_steps = len(plan.get("steps", [])) - (
+    plan.get("steps", []).index(step) + 1
+)
+
+if remaining_steps > 0:
+    validation["needs_next_step"] = True
+
+
+# ----------------------------------------------------
+# Store validator result
+# ----------------------------------------------------
+
+tool_trace.append(
+    {
+        "step": len(tool_trace) + 1,
+        "tool": "agent_validator",
+        "status": (
+            "success"
+            if validation.get("valid", False)
+            else "rejected"
+        ),
+        "arguments": json.dumps(
+            {
+                "validated_tool": tool_name
+            },
+            ensure_ascii=False
+        ),
+        "result": validation
+    }
+)
+
+
+# ----------------------------------------------------
+# Store tool result
+# ----------------------------------------------------
+
+tool_results.append(
+    {
+        "tool": tool_name,
+        "data": result
+    }
+)
+
+
+# ----------------------------------------------------
+# Collect web sources
+# ----------------------------------------------------
+
+if tool_name == "web_search":
+    try:
+        parsed_sources = json.loads(
+            result.get("result", "[]")
+        )
+
+        if isinstance(parsed_sources, list):
+            web_sources.extend(parsed_sources)
+
+    except Exception:
+        pass
+
+
+# ----------------------------------------------------
+# Stop if no next step is required
+# ----------------------------------------------------
+
+if not validation.get("needs_next_step", False):
+    break
+                
+
+
+
+            
+            
+            
+                
+             
+
+                
+                
+                
+            
+
+             
+
+            
+
+          
 
             # ----------------------------------------------------
             # Force planner continuation based on
