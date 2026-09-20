@@ -2056,49 +2056,144 @@ Use tools only when appropriate.
 
     if (
         "numerical" in intents
-        and "calculator" not in planned_tools
+       and "calculator" not in planned_tools
+):
+
+    # ====================================================
+    # First Calculator Attempt
+    # ====================================================
+
+    calculator_result = execute_calculator(
+        standalone_question
+    )
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "calculator",
+            "status": (
+                "success"
+                if calculator_result["success"]
+                else "error"
+            ),
+            "arguments": json.dumps(
+                {
+                    "question":
+                        standalone_question
+                },
+                ensure_ascii=False
+            ),
+            "result": calculator_result.get(
+                "result",
+                ""
+            )
+        }
+    )
+
+    # ====================================================
+    # Validate Calculator Result
+    # ====================================================
+
+    validation_result = validate_tool_result(
+        question=standalone_question,
+        tool_name="calculator",
+        tool_result=calculator_result
+    )
+
+    tool_trace.append(
+        {
+            "step": len(tool_trace) + 1,
+            "tool": "result_validator",
+            "status": (
+                "success"
+                if validation_result.get(
+                    "valid",
+                    False
+                )
+                else "rejected"
+            ),
+            "arguments": json.dumps(
+                {
+                    "validated_tool":
+                        "calculator"
+                },
+                ensure_ascii=False
+            ),
+            "result": validation_result
+        }
+    )
+
+    # ====================================================
+    # Calculator Recovery / Recalculation
+    # ====================================================
+
+    if (
+        not validation_result.get(
+            "valid",
+            False
+        )
+        and validation_result.get(
+            "needs_retry",
+            False
+        )
+        and validation_result.get(
+            "retry_strategy"
+        ) == "recalculate"
     ):
 
-        calculator_result = execute_calculator(
-            standalone_question
+        calculator_retry_result = (
+            execute_calculator_retry(
+                standalone_question
+            )
         )
 
         tool_trace.append(
             {
                 "step": len(tool_trace) + 1,
-                "tool": "calculator",
+                "tool": "calculator_retry",
                 "status": (
                     "success"
-                    if calculator_result["success"]
+                    if calculator_retry_result[
+                        "success"
+                    ]
                     else "error"
                 ),
                 "arguments": json.dumps(
                     {
                         "question":
-                            standalone_question
+                            standalone_question,
+                        "retry": True,
+                        "strategy":
+                            "recalculate"
                     },
                     ensure_ascii=False
                 ),
-                "result": calculator_result.get(
-                    "result",
-                    ""
-                )
+                "result":
+                    calculator_retry_result.get(
+                        "result",
+                        ""
+                    )
             }
         )
 
-        validation_result = validate_tool_result(
+        # ----------------------------------------------
+        # Validate Retry Result
+        # ----------------------------------------------
+
+        retry_validation = validate_tool_result(
             question=standalone_question,
-            tool_name="calculator",
-            tool_result=calculator_result
+            tool_name="calculator_retry",
+            tool_result=calculator_retry_result
         )
 
         tool_trace.append(
             {
                 "step": len(tool_trace) + 1,
-                "tool": "result_validator",
+                "tool":
+                    "result_validator_retry",
                 "status": (
                     "success"
-                    if validation_result.get(
+                    if retry_validation.get(
                         "valid",
                         False
                     )
@@ -2107,21 +2202,44 @@ Use tools only when appropriate.
                 "arguments": json.dumps(
                     {
                         "validated_tool":
-                            "calculator"
+                            "calculator_retry"
                     },
                     ensure_ascii=False
                 ),
-                "result": validation_result
+                "result":
+                    retry_validation
             }
         )
 
-        tool_results.append(
-            {
-                "tool": "calculator",
-                "data": calculator_result,
-                "validation": validation_result
-            }
-        )
+        # Use the successful retry result
+        # as the final calculator result.
+        if retry_validation.get(
+            "valid",
+            False
+        ):
+
+            calculator_result = (
+                calculator_retry_result
+            )
+
+            validation_result = (
+                retry_validation
+            )
+
+    # ====================================================
+    # Store Final Calculator State
+    # ====================================================
+
+    tool_results.append(
+        {
+            "tool": "calculator",
+            "data": calculator_result,
+            "validation":
+                validation_result
+        }
+    )
+    
+   
 
     # --------------------------------------------------------
     # Current Information
