@@ -2854,7 +2854,7 @@ Write the final answer using ONLY the information above.
 
     except Exception as e:
 
-        return (
+      return (
             f"Final response error: {str(e)}"
         )
     
