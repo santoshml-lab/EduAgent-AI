@@ -920,10 +920,13 @@ def execute_study_plan(question: str):
         )
 
         result = study_plan_generator(
-            subject=subject,
-            days=days,
-            hours_per_day=hours_per_day
-        )
+        subject=subject,
+        days=days,
+        hours_per_day=hours_per_day,
+        topics=previous_result
+         )
+            
+            
 
         return {
             "success": True,
@@ -935,6 +938,46 @@ def execute_study_plan(question: str):
         return {
             "success": False,
             "result": f"Study plan error: {str(e)}"
+        }
+
+# ============================================================
+# Helper: Execute Weak Topic Detection
+# ============================================================
+
+def execute_weak_topic(question: str):
+
+    try:
+
+        progress_data = extract_learning_progress(
+            question
+        )
+
+        records = progress_data.get(
+            "records",
+            []
+        )
+
+        if not records:
+
+            return {
+                "success": False,
+                "result": "No learning progress data found."
+            }
+
+        result = weak_topic_detector(
+            records
+        )
+
+        return {
+            "success": True,
+            "result": result
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "result": f"Weak topic detection error: {str(e)}"
         }
 
 
