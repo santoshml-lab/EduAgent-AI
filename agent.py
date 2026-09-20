@@ -939,9 +939,9 @@ def execute_quiz(question: str):
 
 def execute_study_plan(
     question: str,
-    previous_result: str = ""
+    previous_result: str = "",
+    subject: str = ""
 ):
-
     try:
 
         days_match = re.search(
@@ -968,31 +968,31 @@ def execute_study_plan(
             else 2
         )
 
-        subject_match = re.search(
-            r"(?:for|of)\s+"
-            r"(?:Class\s+\d+\s+)?"
-            r"(.+?)(?:\s+with|\s+for|\s*$)",
-            question,
-            re.IGNORECASE
-        )
+        # Prefer the subject provided by the planner.
+        # This prevents the executor from incorrectly
+        # falling back to "General Studies".
+        if not subject:
 
-        subject = (
-            subject_match.group(1).strip()
-            if subject_match
-            else "General Studies"
-        )
+            subject_match = re.search(
+                r"(?:for|of)\s+"
+                r"(?:Class\s+\d+\s+)?"
+                r"(.+?)(?:\s+with|\s+for|\s*$)",
+                question,
+                re.IGNORECASE
+            )
+
+            subject = (
+                subject_match.group(1).strip()
+                if subject_match
+                else "General Studies"
+            )
 
         result = study_plan_generator(
-        subject=subject,
-        days=days,
-        hours_per_day=hours_per_day,
-        topics=previous_result
+            subject=subject,
+            days=days,
+            hours_per_day=hours_per_day,
+            topics=previous_result
         )
-        
-        
-         
-            
-            
 
         return {
             "success": True,
@@ -1003,8 +1003,13 @@ def execute_study_plan(
 
         return {
             "success": False,
-            "result": f"Study plan error: {str(e)}"
+            "result": (
+                f"Study plan error: {str(e)}"
+            )
         }
+    
+        
+            
 
 # ============================================================
 # Helper: Execute Weak Topic Detection
@@ -1692,8 +1697,12 @@ def ask_agent(
 
                   result = execute_study_plan(
                   standalone_question,
-                  previous_result
-)
+                  previous_result,
+                  plan.get("subject", "")
+                  )
+                  
+                  
+
 
             # ----------------------------------------------------
             # Web Search
@@ -1768,8 +1777,12 @@ def ask_agent(
 
                 retry_result = execute_study_plan(
                     standalone_question,
-                    previous_result
+                    previous_result,
+                    plan.get("subject", "")
                 )
+                    
+                    
+                
 
                 tool_trace.append(
                     {
