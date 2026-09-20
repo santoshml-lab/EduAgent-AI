@@ -2920,7 +2920,7 @@ Using ONLY the information above, write the final answer.
     # Final Return
     # --------------------------------------------------------
 
-    return {
+      return {
         "answer": final_answer,
         "tool_trace": tool_trace,
         "sources": web_sources
