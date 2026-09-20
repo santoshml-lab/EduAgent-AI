@@ -2049,15 +2049,14 @@ Use tools only when appropriate.
     # ========================================================
     # Normal Tool Execution
     # ========================================================
+    # --------------------------------------------------------
+    # Numerical
+    # --------------------------------------------------------
 
-# --------------------------------------------------------
-# Numerical
-# --------------------------------------------------------
-
-if (
-    "numerical" in intents
-    and "calculator" not in planned_tools
-):
+    if (
+        "numerical" in intents
+       and "calculator" not in planned_tools
+  ):
 
     calculator_result = execute_calculator(
         standalone_question
@@ -2105,6 +2104,10 @@ if (
             "validation": validation_result
         }
     )
+
+
+
+    
     
     
             
