@@ -1968,19 +1968,19 @@ Use the available tools only when appropriate.
 
             elif planned_tool == "study_plan_generator":
 
-               subject = plan.get(
-               "subject",
-             "General Studies"
+                 subject = plan.get(
+                 "subject",
+                 "General Studies"
     )
 
-             days = plan.get(
-             "days",
-             7
+                days = plan.get(
+                "days",
+                7
     )
 
-            hours_per_day = plan.get(
-            "hours_per_day",
-            1
+                hours_per_day = plan.get(
+                "hours_per_day",
+                1
     )
 
            plan_result = study_plan_generator(
